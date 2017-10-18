@@ -1,9 +1,10 @@
 import * as Plumbing from './Plumbing'
 import * as Snabbdom from "./Snabbdom"
+import * as S from "./Snabbdom"
 import * as typestyle from "typestyle"
 
 import { style } from "typestyle"
-import { h, tag, div, span, checkbox } from "./Snabbdom"
+import { tag, Build } from "./Snabbdom"
 import { VNode } from "snabbdom/vnode"
 
 import { Ref, record, views, at } from "./Dannelib"
@@ -24,7 +25,7 @@ export type State = {
 }
 
 function visibility_from_hash(hash: string, s: State): State {
-  const bare = hash.slice(1)
+  const bare = hash.slice(2)
   if (visibilites.some(x => x == bare)) {
     return {
       ...s,
@@ -67,94 +68,103 @@ function remove_todo(s: State, id: number): State {
   }
 }
 
-const CatchSubmit = (cb: () => void, ...vs: VNode[]) =>
-  h('form', {
-    on: {
-      submit: (e: Event) => {
+const CatchSubmit = (cb: () => void, ...bs: Build[]) =>
+  tag('form',
+    S.on('submit')((e: Event) => {
         cb()
         e.preventDefault()
-      }
-    }
-  }, ...vs)
+      }),
+    ...bs)
 
-const InputField = (r: Ref<string>) =>
-  h('input', {
-    props: {
+const InputField = (r: Ref<string>, ...bs: Build[]) =>
+  tag('input',
+    S.attrs({
       type: 'text',
       value: r.get()
-    },
-    on: {
-      input: (e: Event) => r.set((e.target as HTMLInputElement).value),
-    }
-  })
+    }),
+    S.on('input')((e: Event) => r.set((e.target as HTMLInputElement).value)),
+    ...bs)
 
-function RadioInputs<A>(name: string, r: Ref<A>, opts: {opt: A, cb: (vn: VNode) => VNode}[]): VNode[] {
-  const v = r.get()
-  return opts.map(({opt, cb}, i) =>
-      cb(h('input', {
-        props: {
-          type: 'radio',
-          checked: v == opt,
-          value: i
-        },
-        on: {
-          change(e: Event) {
-            if ((e.target as HTMLInputElement).checked) {
-              r.set(opt)
-            }
-          }
-        }
-      })))
-}
-
-const Complete = style({
-  color: '#090',
-  textDecoration: 'line-through',
-})
-
-const Incomplete = style({
-  color: '#d00',
-})
-
-const Pointer = style({
-  cursor: 'pointer',
-})
-
-const MainStyle = style({
-  fontFamily: "'Lato', sans-serif",
-  fontSize: '15px'
-})
+// actually not a checkbox
+export const Checkbox =
+  (value: boolean, update: (new_value: boolean) => void, ...bs: Build[]) =>
+  tag('span',
+    S.classes({checked: value}),
+    S.on('click')((_: MouseEvent) => update(!value)),
+    S.on('input')((_: Event) => update(!value)),
+    S.styles({cursor: 'pointer'}),
+    ...bs)
 
 const view = (r: Ref<State>) =>
-  div(MainStyle)(
-    CatchSubmit(
-      () => r.modify(new_todo),
-      InputField(r.proj('new_input'))
-    ),
-    div()(
-      ...RadioInputs('visibility', r.proj('visibility'),
-        visibilites.map(opt => ({
-          opt: opt,
-          cb: (vn: VNode) => span()(vn, span()(opt))
-        }))
-      )
-    ),
-    ...views(r.proj('todos'))
-      .filter(todo => r.get().visibility != (todo.get().completed ? 'incomplete' : 'complete'))
-      .map(todo =>
-        div()(
-          span(Pointer, {
-            on: {
-              click: (_: Event) => r.modify(s => remove_todo(s, todo.proj('id').get()))
-            }
-          })('x '),
-          span(todo.proj('completed').get() ? Complete : Incomplete, {
-            on: {
-              click: (_: Event) => todo.proj('completed').modify(b => !b)
-            },
-          }, Pointer)(todo.proj('text').get())
+  tag('section', S.classed('todoapp'), S.id('todoapp'),
+    tag('header', S.classed('header'),
+      tag('h1', 'todos'),
+      CatchSubmit(
+        () => r.modify(new_todo),
+        InputField(
+          r.proj('new_input'),
+          S.attrs({
+            placeholder: 'What needs to be done?',
+            autofocus: true
+          }),
+          S.classed('new-todo')
         )
       )
+    ),
+    r.get()['todos'].length == 0 ? null :
+    tag('section', S.classed('main'),
+      Checkbox(
+        r.proj('todos').get().some(todo => !todo.completed),
+        (_: boolean) => r.proj('todos').modify(
+          todos => todos.map(todo => ({...todo, completed: true}))
+        ),
+        S.classed('toggle-all'),
+        S.id('toggle-all')),
+      tag('ul', S.classed('todo-list'),
+        ...views(r.proj('todos'))
+        .filter(todo => r.get().visibility != (todo.get().completed ? 'incomplete' : 'complete'))
+        .map(todo =>
+          tag('li',
+            S.classes({
+              completed: todo.proj('completed').get(),
+              todo: true
+            }),
+            tag('div', S.classed('view'),
+              Checkbox(
+                todo.proj('completed').get(),
+                todo.proj('completed').set,
+                S.classed('toggle'),
+                S.style('height', '40px')),
+              tag('label', todo.proj('text').get()),
+              tag('button',
+                S.classed('destroy'),
+                S.on('click')((_: Event) =>
+                  r.modify(s => remove_todo(s, todo.proj('id').get()))))
+            ),
+            InputField(todo.proj('text'), S.classed('edit'))
+          )
+        )
+      )
+    ),
+    tag('footer', S.classed('footer'),
+      tag('span', S.classed('todo-count'), r.proj('todos').get().length.toString()),
+      tag('ul', S.classed('filters'),
+        ...visibilites.map((opt: Visibility) =>
+          tag('li',
+            tag('a',
+              S.classes({selected: r.proj('visibility').get() == opt}),
+              S.attrs({href: '#/' + opt}),
+              opt)
+          )
+        )
+      )
+      // todo: clear completed
+    )
   )
 
-export const bind = Plumbing.bind(Plumbing.route(visibility_from_hash, s => s.visibility, view))
+export const bind =
+  Plumbing.bind(
+    Plumbing.route(
+      visibility_from_hash,
+      s => s.visibility,
+      view))

@@ -1,7 +1,7 @@
 import * as csstips from "csstips"
 import * as App from "./App"
-csstips.normalize()
-csstips.setupPage('#root')
+//csstips.normalize()
+//csstips.setupPage('#root')
 
 const root = document.getElementById('root') as HTMLElement
 

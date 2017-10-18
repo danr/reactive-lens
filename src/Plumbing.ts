@@ -13,7 +13,7 @@ export function bind<S>(view: (ref: Ref<S>) => VNode):
       patch(view(r))
     }
     r.on(s => {
-      console.log(s)
+      console.log(JSON.stringify(s, undefined, 2))
       window.localStorage.setItem('state', JSON.stringify(s))
       redraw()
     })
