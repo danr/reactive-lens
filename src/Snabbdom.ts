@@ -88,7 +88,7 @@ function has_type<R extends {type: string}>(x: any): x is R {
   return x.type !== undefined
 }
 
-export function tag(tag: string, ...build: Build[]): VNode {
+export function tag(tag_classes_id: string, ...build: Build[]): VNode {
   let children = [] as Array<VNode | undefined | null>
   let text = undefined as string | undefined
   let key = undefined as string | number | undefined
@@ -99,6 +99,20 @@ export function tag(tag: string, ...build: Build[]): VNode {
   let dataset = {} as Dataset
   let on = {} as On
   let hook = {} as Hooks
+  let tag_name = 'div'
+  const matches = tag_classes_id.match(/([.#]?[^.#\s]+)/g)
+  ;
+  (matches || []).map(x => {
+    if (x.length > 0) {
+      if (x[0] == '#') {
+        build.push(id(x.slice(1)))
+      } else if (x[0] == '.') {
+        build.push(classed(x.slice(1)))
+      } else {
+        tag_name = x
+      }
+    }
+  })
   build.map(b => {
     if (b instanceof Array) {
       children = [...children, ...b]
@@ -131,9 +145,9 @@ export function tag(tag: string, ...build: Build[]): VNode {
   })
   const data = {props, attrs, class: classes, style, dataset, on, hook}
   if (text != undefined) {
-    return h(tag, data, text)
+    return h(tag_name, data, text)
   } else {
-    return h(tag, data, children)
+    return h(tag_name, data, children)
   }
 }
 

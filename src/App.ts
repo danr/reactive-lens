@@ -96,8 +96,8 @@ export const Checkbox =
     ...bs)
 
 const view = (r: Ref<State>) =>
-  tag('section', S.classed('todoapp'), S.id('todoapp'),
-    tag('header', S.classed('header'),
+  tag('section .todoapp #todoapp',
+    tag('header .header',
       tag('h1', 'todos'),
       CatchSubmit(
         () => r.modify(new_todo),
@@ -112,7 +112,7 @@ const view = (r: Ref<State>) =>
       )
     ),
     r.get()['todos'].length == 0 ? null :
-    tag('section', S.classed('main'),
+    tag('section .main',
       Checkbox(
         r.proj('todos').get().some(todo => !todo.completed),
         (_: boolean) => r.proj('todos').modify(
@@ -120,24 +120,22 @@ const view = (r: Ref<State>) =>
         ),
         S.classed('toggle-all'),
         S.id('toggle-all')),
-      tag('ul', S.classed('todo-list'),
+      tag('ul .todo-list',
         ...views(r.proj('todos'))
         .filter(todo => r.get().visibility != (todo.get().completed ? 'incomplete' : 'complete'))
         .map(todo =>
-          tag('li',
+          tag('li .todo',
             S.classes({
-              completed: todo.proj('completed').get(),
-              todo: true
+              completed: todo.proj('completed').get()
             }),
-            tag('div', S.classed('view'),
+            tag('div .view',
               Checkbox(
                 todo.proj('completed').get(),
                 todo.proj('completed').set,
                 S.classed('toggle'),
                 S.style('height', '40px')),
               tag('label', todo.proj('text').get()),
-              tag('button',
-                S.classed('destroy'),
+              tag('button .destroy',
                 S.on('click')((_: Event) =>
                   r.modify(s => remove_todo(s, todo.proj('id').get()))))
             ),
@@ -146,10 +144,10 @@ const view = (r: Ref<State>) =>
         )
       )
     ),
-    tag('footer', S.classed('footer'),
-      tag('span', S.classed('todo-count'), r.proj('todos').get().length.toString()),
-      tag('ul', S.classed('filters'),
-        ...visibilites.map((opt: Visibility) =>
+    tag('footer .footer',
+      tag('span .todo-count', r.proj('todos').get().length.toString()),
+      tag('ul .filters',
+        visibilites.map((opt: Visibility) =>
           tag('li',
             tag('a',
               S.classes({selected: r.proj('visibility').get() == opt}),
