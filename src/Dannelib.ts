@@ -1,36 +1,74 @@
 
+/** Reference to some state */
 export interface Ref<S> extends BareRef<S> {
+  /** Make a new reference by projecting a subfield.
+
+  Note: use only when S is actually an object */
   proj<K extends keyof S>(k: K): Ref<S[K]>
+
+  /** Start a new transaction: now you can use set and modify
+  many times, and only when the (top-level) transaction is finished
+  listeners will be notified
+  */
   transaction: Transaction
+
+  /** Modify the value in the reference
+
+  Note: do not mutate it, return a new value */
   modify(f: (s: S) => S): void
+
+  /** Transform a reference via an isomorphism
+
+  Note: requires that for all s and t we have f(g(t)) = t and g(f(s)) = s
+  */
   iso<T>(f: (s: S) => T, g: (t: T) => S): Ref<T>
 }
 
 type Transaction = (m: () => void) => void
 
 interface BareRef<S> {
+  /** Get the current value
+
+  Note: do not mutate this value
+  */
   get(): S
+  /** Set to a new value */
   set(s: S): void
 }
 
 interface OnChange<S> {
-  on(change: Change<S>): void
+  /** React on changes. returns an unsubscribe function */
+  on(change: Change<S>): (() => void)
 }
 
 type Change<S> = ((s: S) => void)
 
+/** Make a new reference which can have listeners given the initial state */
 export function ref<S>(s0: S): Ref<S> & OnChange<S> {
+  /** Current state */
   let s = s0
+  /** Transaction depth, only notify when setting at depth 0 */
   let d = 0
-  const listeners = [] as Change<S>[]
-  function notify() {
-    if (d == 0) {
-      listeners.map(k => k(s))
+  /** Only notify on transactions that actually did set */
+  let pending = false
+  /** Unique supply of identifiers */
+  let us = 0
+  /** Listeners */
+  const listeners = {} as Record<string, Change<S>>
+  /** Notify listeners if applicable */
+  const notify = () => {
+    if (d == 0 && pending) {
+      pending = false
+      Object.keys(listeners).map(id => listeners[id](s))
     }
   }
   return {
     on(k: Change<S>) {
-      listeners.push(k)
+      const id = us++
+      listeners[id] = k
+      return () => {
+        delete listeners[id]
+      }
     },
     ...bless(m => {
       d++
@@ -41,17 +79,19 @@ export function ref<S>(s0: S): Ref<S> & OnChange<S> {
       get: () => s,
       set: (v: S) => {
         s = v
+        pending = true
         notify()
       }
     }),
   }
 }
 
+/** Bless a bare reference with utility functions */
 export function bless<R>(transaction: Transaction, ref: BareRef<R>): Ref<R> {
   return {
     ...ref,
     modify: f => ref.set(f(ref.get())),
-    proj: k => proj(transaction, ref, k),
+    proj: k => proj_bare(transaction, ref, k),
     iso: (f, g) => bless(transaction, {
       get: () => f(ref.get()),
       set: v => ref.set(g(v))
@@ -60,13 +100,21 @@ export function bless<R>(transaction: Transaction, ref: BareRef<R>): Ref<R> {
   }
 }
 
-export function proj<R, K extends keyof R>(transaction: Transaction, ref: BareRef<R>, k: K): Ref<R[K]> {
+/** Project a key from a bare reference */
+export function proj_bare<R, K extends keyof R>(transaction: Transaction, ref: BareRef<R>, k: K): Ref<R[K]> {
   return bless(transaction, {
     get: () => ref.get()[k],
     set: (v: R[K]) => ref.set({...ref.get() as any, [k as string]: v}),
   })
 }
 
+/** Project a key from a reference */
+export function proj<R, K extends keyof R>(ref: Ref<R>, k: K): Ref<R[K]> {
+  return proj_bare(ref.transaction, ref, k)
+}
+
+
+/** Make a new refence from many in a record */
 export function record<R>(refs: {[P in keyof R]: Ref<R[P]>}): Ref<R> {
   for (const base_key in refs) {
     const transaction = refs[base_key].transaction
@@ -90,6 +138,7 @@ export function record<R>(refs: {[P in keyof R]: Ref<R[P]>}): Ref<R> {
   throw "Empty record"
 }
 
+/** Make a reference to a particular index in an array */
 export function at<A>(ref: Ref<A[]>, index: number): Ref<A> {
   return bless(ref.transaction, {
     get() {
@@ -106,6 +155,12 @@ export function at<A>(ref: Ref<A[]>, index: number): Ref<A> {
   })
 }
 
+/** Get references to all indexes in an array */
+export function views<A>(ref: Ref<A[]>): Ref<A>[] {
+  return ref.get().map((_, i) => at(ref, i))
+}
+
+/** Refer to two arrays after each other */
 export function glue<A>(a: Ref<A[]>, b: Ref<A[]>): Ref<A[]> {
   return bless(a.transaction, {
     get: () => ([] as A[]).concat(a.get(), b.get()),
@@ -119,9 +174,6 @@ export function glue<A>(a: Ref<A[]>, b: Ref<A[]>): Ref<A[]> {
   })
 }
 
-export function views<A>(ref: Ref<A[]>): Ref<A>[] {
-  return ref.get().map((_, i) => at(ref, i))
-}
 
 /*
 const r = ref({a: 1, b: [2, 3], c: {d: [3, 4], e: 4}})
