@@ -21,51 +21,62 @@ export const h = snabbdom.h
 export type VNode = vnode.VNode
 export type VNodeData = vnode.VNodeData
 
+const enum BuildType {
+  Key,
+  Props,
+  Attrs,
+  Classes,
+  Style,
+  Dataset,
+  On,
+  Hook,
+}
+
 export type Build
   = Array<VNode | undefined  | null>
   | VNode
   | string
   | null
   | undefined
-  | { type: 'key', data: string | number}
-  | { type: 'props', data: Props }
-  | { type: 'attrs', data: Attrs }
-  | { type: 'classes', data: Classes }
-  | { type: 'style', data: VNodeStyle }
-  | { type: 'dataset', data: Dataset }
-  | { type: 'on', data: On }
-  | { type: 'hook', data: Hooks }
+  | { type: BuildType.Key, data: string | number}
+  | { type: BuildType.Props, data: Props }
+  | { type: BuildType.Attrs, data: Attrs }
+  | { type: BuildType.Classes, data: Classes }
+  | { type: BuildType.Style, data: VNodeStyle }
+  | { type: BuildType.Dataset, data: Dataset }
+  | { type: BuildType.On, data: On }
+  | { type: BuildType.Hook, data: Hooks }
 
 export function id(id: string): Build {
-  return {type: 'attrs', data: {id}}
+  return {type: BuildType.Attrs, data: {id}}
 }
 
 export function key(key: string | number): Build {
-  return {type: 'key', data: key}
+  return {type: BuildType.Key, data: key}
 }
 
 export function props(props: Props): Build {
-  return {type: 'props', data: props}
+  return {type: BuildType.Props, data: props}
 }
 
 export function attrs(attrs: Attrs): Build {
-  return {type: 'attrs', data: attrs}
+  return {type: BuildType.Attrs, data: attrs}
 }
 
 export function classes(classes: Classes): Build {
-  return {type: 'classes', data: classes}
+  return {type: BuildType.Classes, data: classes}
 }
 
 export function styles(styles: VNodeStyle): Build {
-  return {type: 'style', data: styles}
+  return {type: BuildType.Style, data: styles}
 }
 
 export function dataset(dataset: Dataset): Build {
-  return {type: 'dataset', data: dataset}
+  return {type: BuildType.Dataset, data: dataset}
 }
 
 export function hook(hook: Hooks): Build {
-  return {type: 'hook', data: hook}
+  return {type: BuildType.Hook, data: hook}
 }
 
 export function style(k: string, v: string): Build {
@@ -77,14 +88,14 @@ export function classed(c: string): Build {
 }
 
 export function on<N extends keyof HTMLElementEventMap>(name: N): (h: (e: HTMLElementEventMap[N]) => void) => Build {
-  return h => ({type: 'on', data: {[name as string]: h}})
+  return h => ({type: BuildType.On, data: {[name as string]: h}})
 }
 
 export function on_(name: string, h: (e: Event) => void): Build {
-  return ({type: 'on', data: {[name]: h}})
+  return ({type: BuildType.On, data: {[name]: h}})
 }
 
-function has_type<R extends {type: string}>(x: any): x is R {
+function has_type<R extends {type: BuildType}>(x: any): x is R {
   return x.type !== undefined
 }
 
@@ -122,21 +133,21 @@ export function tag(tag_classes_id: string, ...build: Build[]): VNode {
       // skip
     } else if (has_type(b)) {
       switch (b.type) {
-        case 'key': key = b.data
+        case BuildType.Key: key = b.data
         break;
-        case 'props': props = {...props, ...b.data}
+        case BuildType.Props: props = {...props, ...b.data}
         break;
-        case 'attrs': attrs = {...attrs, ...b.data}
+        case BuildType.Attrs: attrs = {...attrs, ...b.data}
         break;
-        case 'classes': classes = {...classes, ...b.data}
+        case BuildType.Classes: classes = {...classes, ...b.data}
         break;
-        case 'style': style = {...style, ...b.data}
+        case BuildType.Style: style = {...style, ...b.data}
         break;
-        case 'dataset': dataset = {...dataset, ...b.data}
+        case BuildType.Dataset: dataset = {...dataset, ...b.data}
         break;
-        case 'on': on = {...on, ...b.data}
+        case BuildType.On: on = {...on, ...b.data}
         break;
-        case 'hook': hook = {...hook, ...b.data}
+        case BuildType.Hook: hook = {...hook, ...b.data}
         break;
       }
     } else {
