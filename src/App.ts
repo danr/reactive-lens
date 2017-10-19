@@ -121,7 +121,7 @@ const view = (r: Ref<State>) =>
         S.classed('toggle-all'),
         S.id('toggle-all')),
       tag('ul .todo-list',
-        ...views(r.proj('todos'))
+        views(r.proj('todos'))
         .filter(todo => r.get().visibility != (todo.get().completed ? 'incomplete' : 'complete'))
         .map(todo =>
           tag('li .todo',
