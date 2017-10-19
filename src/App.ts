@@ -13,13 +13,15 @@ export type Visibility = 'all' | 'complete' | 'incomplete'
 
 const visibilites = ['all', 'complete', 'incomplete'] as Visibility[]
 
+interface Todo {
+  id: number,
+  text: string,
+  completed: boolean
+}
+
 export type State = {
   next_id: number,
-  todos: {
-    id: number,
-    text: string,
-    completed: boolean
-  }[],
+  todos: Todo[],
   new_input: string,
   visibility: Visibility
 }
@@ -61,12 +63,10 @@ function new_todo(s: State): State {
   }
 }
 
-function remove_todo(s: State, id: number): State {
-  return {
-    ...s,
-    todos: s.todos.filter(t => t.id != id)
-  }
-}
+const remove_todo =
+  (id: number) =>
+  (todos: Todo[]) =>
+  todos.filter(t => t.id != id)
 
 const CatchSubmit = (cb: () => void, ...bs: Build[]) =>
   tag('form',
@@ -96,69 +96,71 @@ export const Checkbox =
     ...bs)
 
 const view = (r: Ref<State>) =>
-  tag('section .todoapp #todoapp',
-    tag('header .header',
-      tag('h1', 'todos'),
-      CatchSubmit(
-        () => r.modify(new_todo),
-        InputField(
-          r.proj('new_input'),
-          S.attrs({
-            placeholder: 'What needs to be done?',
-            autofocus: true
-          }),
-          S.classed('new-todo')
-        )
-      )
-    ),
-    r.get()['todos'].length == 0 ? null :
-    tag('section .main',
-      Checkbox(
-        r.proj('todos').get().some(todo => !todo.completed),
-        (_: boolean) => r.proj('todos').modify(
-          todos => todos.map(todo => ({...todo, completed: true}))
-        ),
-        S.classed('toggle-all'),
-        S.id('toggle-all')),
-      tag('ul .todo-list',
-        views(r.proj('todos'))
-        .filter(todo => r.get().visibility != (todo.get().completed ? 'incomplete' : 'complete'))
-        .map(todo =>
-          tag('li .todo',
-            S.classes({
-              completed: todo.proj('completed').get()
+  r.proj$('todos', todos =>
+    tag('section .todoapp #todoapp',
+      tag('header .header',
+        tag('h1', 'todos'),
+        CatchSubmit(
+          () => r.modify(new_todo),
+          InputField(
+            r.proj('new_input'),
+            S.attrs({
+              placeholder: 'What needs to be done?',
+              autofocus: true
             }),
-            tag('div .view',
-              Checkbox(
-                todo.proj('completed').get(),
-                todo.proj('completed').set,
-                S.classed('toggle'),
-                S.style('height', '40px')),
-              tag('label', todo.proj('text').get()),
-              tag('button .destroy',
-                S.on('click')((_: Event) =>
-                  r.modify(s => remove_todo(s, todo.proj('id').get()))))
-            ),
-            InputField(todo.proj('text'), S.classed('edit'))
+            S.classed('new-todo')
           )
         )
-      )
-    ),
-    tag('footer .footer',
-      tag('span .todo-count', r.proj('todos').get().length.toString()),
-      tag('ul .filters',
-        visibilites.map((opt: Visibility) =>
-          tag('li',
-            tag('a',
-              S.classes({selected: r.proj('visibility').get() == opt}),
-              S.attrs({href: '#/' + opt}),
-              opt)
+      ),
+      r.get()['todos'].length == 0 ? null :
+      tag('section .main',
+        Checkbox(
+          todos.get().some(todo => !todo.completed),
+          (b: boolean) => todos.modify(
+            todos => todos.map(todo => ({...todo, completed: !b}))
+          ),
+          S.classed('toggle-all'),
+          S.id('toggle-all')),
+        tag('ul .todo-list',
+          views(todos)
+            .filter(todo => r.get().visibility != (todo.get().completed ? 'incomplete' : 'complete'))
+            .map(todo => {
+              const {completed, id, text} = todo.get()
+              return tag('li .todo',
+                S.classes({ completed }),
+                tag('div .view',
+                  Checkbox(
+                    completed,
+                    todo.proj('completed').set,
+                    S.classed('toggle'),
+                    S.style('height', '40px')),
+                  tag('label', text),
+                  tag('button .destroy',
+                    S.on('click')(_ => todos.modify(remove_todo(id))))
+                ),
+                InputField(todo.proj('text'), S.classed('edit'))
+              )
+            })
+          )
+      ),
+      tag('footer .footer',
+        tag('span .todo-count', r.proj('todos').get().length.toString()),
+        tag('ul .filters',
+          visibilites.map((opt: Visibility) =>
+            tag('li',
+              tag('a',
+                S.classes({selected: r.proj('visibility').get() == opt}),
+                S.attrs({href: '#/' + opt}),
+                opt)
+            )
           )
         )
+        // todo: clear completed
       )
-      // todo: clear completed
     )
   )
+
+
 
 export const bind =
   Plumbing.bind(

@@ -6,6 +6,11 @@ export interface Ref<S> extends BareRef<S> {
   Note: use only when S is actually an object */
   proj<K extends keyof S>(k: K): Ref<S[K]>
 
+  /** Invoke a function with a reference to a subfield.
+
+  Note: use only when S is actually an object */
+  proj$<K extends keyof S, R>(k: K, f: (ref: Ref<S[K]>) => R): R
+
   /** Start a new transaction: now you can use set and modify
   many times, and only when the (top-level) transaction is finished
   listeners will be notified
@@ -92,6 +97,7 @@ export function bless<R>(transaction: Transaction, ref: BareRef<R>): Ref<R> {
     ...ref,
     modify: f => ref.set(f(ref.get())),
     proj: k => proj_bare(transaction, ref, k),
+    proj$: (k, f) => f(proj_bare(transaction, ref, k)),
     iso: (f, g) => bless(transaction, {
       get: () => f(ref.get()),
       set: v => ref.set(g(v))
