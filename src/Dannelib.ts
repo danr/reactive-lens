@@ -51,8 +51,13 @@ export class Ref<S> {
   /** Invoke a function with a reference to a subfield.
 
   Note: use only when S is actually an object */
-  proj$<K extends keyof S, A>(k: K, f: (s: Ref<S[K]>) => A) {
+  $proj<K extends keyof S, A>(k: K, f: (s: Ref<S[K]>) => A) {
     return f(this.proj(k))
+  }
+
+  /** Invoke a function with the value of the reference */
+  $get<A>(f: (s: S) => A): A {
+    return f(this.get())
   }
 
   /** Transform a reference via an isomorphism
