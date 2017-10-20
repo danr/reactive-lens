@@ -2,12 +2,13 @@ import * as Snabbdom from "./Snabbdom"
 
 import { VNode } from "snabbdom/vnode"
 
-import { Ref, ref } from "./Dannelib"
+import { Ref } from "./Dannelib"
 
 export function bind<S>(view: (ref: Ref<S>) => VNode):
     (root_element: HTMLElement, s0: S) => () => S {
   return (root_element: HTMLElement, s0: S) => {
-    const r = ref(s0)
+    const r = Ref.root(s0)
+    ; (window as any).r = r
     const patch = setup(root_element)
     function redraw() {
       patch(view(r))

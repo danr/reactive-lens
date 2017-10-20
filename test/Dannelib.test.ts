@@ -1,4 +1,4 @@
-import { Ref, ref, record, views, at, glue, paginate } from './../src/Dannelib'
+import { Ref, record, views, at, glue, paginate } from './../src/Dannelib'
 import * as test from "tape"
 
 function reverse<A>(xs: A[]): A[] {
@@ -8,7 +8,7 @@ function reverse<A>(xs: A[]): A[] {
 test('Dannelib', assert => {
   let initial_state = {a: 1, b: [2, 3], c: {d: [3, 4], e: 4}}
   let initial_copy = {a: 1, b: [2, 3], c: {d: [3, 4], e: 4}}
-  const r = ref(initial_state)
+  const r = Ref.root(initial_state)
   let current: any
   let transaction_count = 0
   let oracle_count = 0
