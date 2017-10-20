@@ -6,20 +6,18 @@
   "description": "TodoMVC using dannelib",
   "main": "./dist/bundle.js",
   "dependencies": {
-    "csstips": "^0.2.2",
     "snabbdom": "^0.7.0",
-    "typestyle": "^1.4.1",
     "todomvc-app-css": "^1.0.0",
     "todomvc-common": "^1.0.1"
   },
   "devDependencies": {
-    "@types/mocha": "^2.2.42",
+    "@types/tape": "^4.2.30",
     "awesome-typescript-loader": "^3.0.3",
     "css-loader": "^0.28.1",
-    "jsverify": "^0.8.3",
-    "mocha": "^3.5.0",
     "source-map-loader": "^0.1.5",
     "style-loader": "^0.17.0",
+    "tap-diff": "^0.1.1",
+    "tape": "^4.8.0",
     "ts-node": "^3.3.0",
     "typescript": "2.4.2",
     "uglifyjs-webpack-plugin": "^0.4.6",
@@ -30,7 +28,6 @@
   "scripts": {
     "start": "webpack-dev-server --hot",
     "build": "NODE_ENV=production webpack --display-optimization-bailout",
-    "pretest": "tsc src/*test.ts --module commonjs --target es6 --allowUnreachableCode",
-    "test": "mocha src/*test.js"
+    "test": "./node_modules/.bin/ts-node node_modules/.bin/tape test/*.ts | ./node_modules/.bin/tap-diff"
   }
 }

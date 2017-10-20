@@ -43,7 +43,7 @@ export class Ref<S> {
   proj<K extends keyof S>(k: K): Ref<S[K]> {
     return new Ref(
       this.transaction,
-      this.on,
+      this.listen,
       () => this.get()[k],
       (v: S[K]) => this.set({...this.get() as any, [k as string]: v}),
     )
@@ -62,7 +62,7 @@ export class Ref<S> {
   iso<T>(f: (s: S) => T, g: (t: T) => S): Ref<T> {
     return new Ref(
       this.transaction,
-      this.on,
+      this.listen,
       () => f(this.get()),
       (t: T) => this.set(g(t))
     )
@@ -85,7 +85,9 @@ export function ref<S>(s0: S): Ref<S> {
   const notify = () => {
     if (d == 0 && pending) {
       pending = false
-      Object.keys(listeners).map(id => listeners[id]())
+      Object.keys(listeners).map(id => {
+        listeners[id]()
+      })
     }
   }
   return new Ref(
@@ -175,28 +177,3 @@ export function glue<A>(a: Ref<A[]>, b: Ref<A[]>): Ref<A[]> {
   )
 }
 
-/*
-const r = ref({a: 1, b: [2, 3], c: {d: [3, 4], e: 4}})
-r.on(x => console.log(x))
-const ra = r.proj('a')
-ra.set(999)
-const re = r.proj('c').proj('e')
-re.set(998)
-const rae = record({a: ra, e: re})
-rae.set({a: 10, e: 20})
-const rbs = r.proj('b')
-
-view(rbs)[1].set(882)
-at(rbs, 0).modify(x => x + 1)
-
-console.log('glue:')
-view(glue(rbs, r.proj('c').proj('d'))).map(r => r.modify(x => x + 1))
-
-export function reverse<A>(xs: A[]): A[] {
-  return xs.slice().reverse()
-}
-
-console.log('iso:')
-
-at(rbs.iso(reverse, reverse), 0).set(42)
-*/

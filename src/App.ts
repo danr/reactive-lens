@@ -1,9 +1,7 @@
 import * as Plumbing from './Plumbing'
 import * as Snabbdom from "./Snabbdom"
 import * as S from "./Snabbdom"
-import * as typestyle from "typestyle"
 
-import { style } from "typestyle"
 import { tag, Build } from "./Snabbdom"
 import { VNode } from "snabbdom/vnode"
 
