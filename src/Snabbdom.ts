@@ -99,6 +99,12 @@ function has_type<R extends {type: BuildType}>(x: any): x is R {
   return x.type !== undefined
 }
 
+function imprint<T>(base: Record<string, T>, more: Record<string, T>) {
+  for (const k in more) {
+    base[k] = more[k]
+  }
+}
+
 export function tag(tag_classes_id: string, ...build: Build[]): VNode {
   let children = [] as Array<VNode | undefined | null>
   let text = undefined as string | undefined
@@ -126,7 +132,7 @@ export function tag(tag_classes_id: string, ...build: Build[]): VNode {
   })
   build.map(b => {
     if (b instanceof Array) {
-      children = [...children, ...b]
+      children.push(...b)
     } else if (typeof b == 'string') {
       text = b
     } else if (typeof b == 'undefined' || b == null) {
@@ -135,23 +141,23 @@ export function tag(tag_classes_id: string, ...build: Build[]): VNode {
       switch (b.type) {
         case BuildType.Key: key = b.data
         break;
-        case BuildType.Props: props = {...props, ...b.data}
+        case BuildType.Props: imprint(props, b.data)
         break;
-        case BuildType.Attrs: attrs = {...attrs, ...b.data}
+        case BuildType.Attrs: imprint(attrs, b.data)
         break;
-        case BuildType.Classes: classes = {...classes, ...b.data}
+        case BuildType.Classes: imprint(classes, b.data)
         break;
-        case BuildType.Style: style = {...style, ...b.data}
+        case BuildType.Style: imprint(style, b.data)
         break;
-        case BuildType.Dataset: dataset = {...dataset, ...b.data}
+        case BuildType.Dataset: imprint(dataset, b.data)
         break;
-        case BuildType.On: on = {...on, ...b.data}
+        case BuildType.On: imprint(on, b.data)
         break;
-        case BuildType.Hook: hook = {...hook, ...b.data}
+        case BuildType.Hook: imprint(hook as Record<string, any>, b.data)
         break;
       }
     } else {
-      children = [...children, b]
+      children.push(b)
     }
   })
   const data = {props, attrs, class: classes, style, dataset, on, hook}
