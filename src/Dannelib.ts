@@ -177,3 +177,20 @@ export function glue<A>(a: Ref<A[]>, b: Ref<A[]>): Ref<A[]> {
   )
 }
 
+/** Helper function to paginate */
+export function chunk<A>(xs: A[], chunk_size: number): A[][] {
+  const out = [] as A[][]
+  for (let i = 0; i < xs.length; i += chunk_size) {
+    out.push(xs.slice(i, i + chunk_size))
+  }
+  return out
+}
+
+/** Paginate a reference into equal pieces of a chunk size */
+export function paginate<A>(r: Ref<A[]>, chunk_size: number): Ref<A[][]> {
+  return r.iso(
+    xs => chunk(xs, chunk_size),
+    xss => ([] as A[]).concat(...xss)
+  )
+}
+

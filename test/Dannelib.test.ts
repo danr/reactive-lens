@@ -1,4 +1,4 @@
-import { Ref, ref, record, views, at, glue } from './../src/Dannelib'
+import { Ref, ref, record, views, at, glue, paginate } from './../src/Dannelib'
 import * as test from "tape"
 
 function reverse<A>(xs: A[]): A[] {
@@ -61,6 +61,16 @@ test('Dannelib', assert => {
   assert.equal(a, 404, 'not intercepted on after unsubscribe')
 
   assert.deepEqual(initial_state, initial_copy, 'original state unchanged')
+
+  r.proj('b').set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+  after('b setup', {a: 405, b: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], c: {d: [4, 5], e: 20}})
+
+  const p = paginate(r.proj('b'), 3)
+  at(p, 1).modify(xs => xs.map(x => -x))
+  after('paginated modify', {a: 405, b: [1, 2, 3, -4, -5, -6, 7, 8, 9, 10, 11], c: {d: [4, 5], e: 20}})
+
+  at(p, 3).modify(xs => xs.map(x => -x))
+  after('paginated chopped modify', {a: 405, b: [1, 2, 3, -4, -5, -6, 7, 8, 9, -10, -11], c: {d: [4, 5], e: 20}})
 
   assert.end()
 })
