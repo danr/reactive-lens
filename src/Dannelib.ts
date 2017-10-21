@@ -74,43 +74,32 @@ export class Ref<S> {
     /** Current state */
     let s = s0
     /** Transaction depth, only notify when setting at depth 0 */
-    let d = 0
+    let depth = 0
     /** Only notify on transactions that actually did set */
     let pending = false
-    /** Unique supply of identifiers */
-    let us = 0
     /** Listeners */
-    const listeners = {} as Record<string, Change>
+    const listeners = new ListWithRemove<Change>()
     /** Notify listeners if applicable */
-    const notify = () => {
-      if (d == 0 && pending) {
+    function notify(): void {
+      if (depth == 0 && pending) {
         pending = false
-        Object.keys(listeners).map(id => {
-          listeners[id]()
-        })
+        // must use a transaction because listeners might set the state again
+        transaction(() => listeners.iter(k => k()))
       }
     }
-    return new Ref(
-      m => {
-        d++
-        m()
-        d--
-        notify()
-      },
-      (k: Change) => {
-        const id = us++
-        listeners[id] = k
-        return () => {
-          delete listeners[id]
-        }
-      },
-      () => s,
+    function transaction(m: () => void) {
+      depth++
+      m()
+      depth--
+      notify()
+    }
+    const set =
       (v: S) => {
-          s = v
-          pending = true
-          notify()
-        }
-      )
+        s = v
+        pending = true
+        notify()
+      }
+    return new Ref(transaction, k => listeners.push(k), () => s, set)
   }
 
 }
@@ -191,5 +180,39 @@ export function paginate<A>(r: Ref<A[]>, chunk_size: number): Ref<A[][]> {
     xs => chunk(xs, chunk_size),
     xss => ([] as A[]).concat(...xss)
   )
+}
+
+class ListWithRemove<A> {
+  private next_unique = 0
+  private order = [] as (string[] | null)
+  private dict = {} as Record<string, A>
+
+  constructor() {}
+
+  /** Push a new element, returns the delete function */
+  public push(a: A): () => void {
+    const id = this.next_unique++ + ''
+    this.dict[id] = a
+    if (this.order != null) {
+      this.order.push(id)
+    }
+    return () => {
+      delete this.dict[id]
+      this.order = null
+    }
+  }
+
+  /** Iterate over the elements */
+  public iter(f: (a: A) => void): void {
+    if (this.order == null) {
+      const cmp = (a: string, b: string) => parseInt(a) - parseInt(b)
+      this.order = Object.keys(this.dict).sort(cmp)
+    }
+    this.order.map(id => {
+      if (id in this.dict) {
+        f(this.dict[id])
+      }
+    })
+  }
 }
 
