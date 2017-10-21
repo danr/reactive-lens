@@ -5,6 +5,7 @@
   "author": "Dan Rosén",
   "description": "TodoMVC using dannelib",
   "main": "./dist/bundle.js",
+  "repository": "https://github.com/danr/dannelib-todomvc.git/",
   "dependencies": {
     "snabbdom": "^0.7.0",
     "todomvc-app-css": "^1.0.0",
@@ -26,7 +27,7 @@
     "webpack-dev-server": "2.3.0"
   },
   "scripts": {
-    "start": "webpack-dev-server --hot",
+    "start": "./node_modules/.bin/webpack-dev-server --hot",
     "build": "NODE_ENV=production webpack --display-optimization-bailout",
     "test": "./node_modules/.bin/ts-node node_modules/.bin/tape test/*.ts | ./node_modules/.bin/tap-diff"
   }
