@@ -93,8 +93,11 @@ export const Checkbox =
     S.styles({cursor: 'pointer'}),
     ...bs)
 
-const view = (r: Ref<State>) =>
-  tag('section .todoapp #todoapp',
+const view = (r: Ref<State>) => {
+  const {todos, visibility} = r.get()
+  const todos_ref = r.proj('todos')
+
+  const Header =
     tag('header .header',
       tag('h1', 'todos'),
       CatchSubmit(
@@ -105,48 +108,53 @@ const view = (r: Ref<State>) =>
             placeholder: 'What needs to be done?',
             autofocus: true
           }),
-          S.classed('new-todo')))),
-    r.$proj('todos', todos =>
-      todos.get().length == 0 ? null :
-      tag('section .main',
-        Checkbox(
-          todos.get().some(todo => !todo.completed),
-          (b: boolean) => todos.modify(
-            todos => todos.map(todo => ({...todo, completed: !b}))),
-          S.classed('toggle-all'),
-          S.id('toggle-all')),
-        tag('ul .todo-list',
-          views(todos)
-          .filter(todo => r.get().visibility != (todo.get().completed ? 'incomplete' : 'complete'))
-          .map(todo =>
-            todo.$get(
-              ({completed, id, text}) =>
-              tag('li .todo',
-                S.classes({ completed }),
-                tag('div .view',
-                  Checkbox(
-                    completed,
-                    todo.proj('completed').set,
-                    S.classed('toggle'),
-                    S.style('height', '40px')),
-                  tag('label', text),
-                  tag('button .destroy',
-                    S.on('click')(_ => todos.modify(remove_todo(id))))),
-                InputField(todo.proj('text'), S.classed('edit')))))))),
+          S.classed('new-todo'))))
+
+   const TodoView =
+     (todo_ref: Ref<Todo>, {completed, id, text}: Todo) =>
+       tag('li .todo',
+         S.classes({ completed }),
+         tag('div .view',
+           Checkbox(
+             completed,
+             todo_ref.proj('completed').set,
+             S.classed('toggle'),
+             S.style('height', '40px')),
+           tag('label', text),
+           tag('button .destroy',
+             S.on('click')(_ => todos_ref.modify(remove_todo(id))))),
+         InputField(todo_ref.proj('text'), S.classed('edit')))
+
+   const Main =
+     todos.length == 0 ? null :
+     tag('section .main',
+       Checkbox(
+         todos.some(todo => !todo.completed),
+         (b: boolean) => todos_ref.modify(
+           todos => todos.map(todo => ({...todo, completed: !b}))),
+         S.classed('toggle-all'),
+         S.id('toggle-all')),
+       tag('ul .todo-list',
+         views(todos_ref)
+         .map(ref => ({ref, todo: ref.get()}))
+         .filter(({todo}) => visibility != (todo.completed ? 'incomplete' : 'complete'))
+         .map(({ref, todo}) => TodoView(ref, todo))))
+
+  const Footer =
     tag('footer .footer',
-      tag('span .todo-count', r.proj('todos').get().length.toString()),
+      tag('span .todo-count', todos.length.toString()),
       tag('ul .filters',
         visibilites.map((opt: Visibility) =>
           tag('li',
             tag('a',
-              S.classes({selected: r.proj('visibility').get() == opt}),
+              S.classes({selected: visibility == opt}),
               S.attrs({href: '#/' + opt}),
-              opt))))
-      // todo: clear completed
-  ))
+              opt)))))
 
+  // todo: clear completed
 
-
+  return tag('section .todoapp #todoapp', Header, Main, Footer)
+}
 
 export const attach =
   Plumbing.attach(
