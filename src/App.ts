@@ -148,8 +148,8 @@ const view = (r: Ref<State>) =>
 
 
 
-export const bind =
-  Plumbing.bind(
+export const attach =
+  Plumbing.attach(
     Plumbing.route(
       visibility_from_hash,
       s => s.visibility,

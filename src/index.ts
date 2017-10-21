@@ -2,9 +2,9 @@ import * as App from "./App"
 
 const root = document.getElementById('root') as HTMLElement
 
-let App_bind = App.bind
+let App_attach = App.attach
 
-let get = App_bind(root, App.init)
+let get = App_attach(root, App.init)
 
 declare const module: any;
 declare const require: any;
@@ -14,8 +14,8 @@ if (Debug) {
   if (module.hot) {
     module.hot.accept('./App.ts', (_: any) => {
       try {
-        App_bind = require('./App.ts').bind
-        get = App_bind(root, get())
+        App_attach = require('./App.ts').attach
+        get = App_attach(root, get())
       } catch (e) {
         console.error(e)
       }

@@ -4,7 +4,7 @@ import { VNode } from "snabbdom/vnode"
 
 import { Ref } from "./Dannelib"
 
-export function bind<S>(view: (ref: Ref<S>) => VNode):
+export function attach<S>(view: (ref: Ref<S>) => VNode):
     (root_element: HTMLElement, s0: S) => () => S {
   return (root_element: HTMLElement, s0: S) => {
     const r = Ref.root(s0)
