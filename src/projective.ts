@@ -144,23 +144,8 @@ export function views<A>(ref: Ref<A[]>): Ref<A>[] {
   return ref.get().map((_, i) => at(ref, i))
 }
 
-/** Refer to two arrays after each other */
-export function glue<A>(a: Ref<A[]>, b: Ref<A[]>): Ref<A[]> {
-  return Ref.sub(
-    a,
-    () => ([] as A[]).concat(a.get(), b.get()),
-    (v: A[]) => {
-      const al = a.get().length
-      a.transaction(() => {
-        a.set(v.slice(0, al))
-        b.set(v.slice(al))
-      })
-    }
-  )
-}
-
 /** Helper function to paginate */
-export function chunk<A>(xs: A[], chunk_size: number): A[][] {
+function chunk<A>(xs: A[], chunk_size: number): A[][] {
   const out = [] as A[][]
   for (let i = 0; i < xs.length; i += chunk_size) {
     out.push(xs.slice(i, i + chunk_size))

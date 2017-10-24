@@ -1,8 +1,23 @@
-import { Ref, record, views, at, glue, paginate } from './../src/projective'
+import { Ref, record, views, at, paginate } from './../src/projective'
 import * as test from "tape"
 
 function reverse<A>(xs: A[]): A[] {
   return xs.slice().reverse()
+}
+
+/** Refer to two arrays after each other */
+function glue<A>(a: Ref<A[]>, b: Ref<A[]>): Ref<A[]> {
+  return Ref.sub(
+    a,
+    () => ([] as A[]).concat(a.get(), b.get()),
+    (v: A[]) => {
+      const al = a.get().length
+      a.transaction(() => {
+        a.set(v.slice(0, al))
+        b.set(v.slice(al))
+      })
+    }
+  )
 }
 
 test('projective', assert => {
