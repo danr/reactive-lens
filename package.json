@@ -45,5 +45,9 @@
   "bugs": {
     "url": "https://github.com/danr/projective/issues"
   },
-  "homepage": "https://github.com/danr/projective#readme"
+  "homepage": "https://github.com/danr/projective#readme",
+  "files": [
+    "projective.js",
+    "projective.d.ts"
+  ]
 }
