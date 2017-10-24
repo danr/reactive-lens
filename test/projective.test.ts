@@ -1,11 +1,11 @@
-import { Ref, record, views, at, glue, paginate } from './../src/Dannelib'
+import { Ref, record, views, at, glue, paginate } from './../src/projective'
 import * as test from "tape"
 
 function reverse<A>(xs: A[]): A[] {
   return xs.slice().reverse()
 }
 
-test('Dannelib', assert => {
+test('projective', assert => {
   let initial_state = {a: 1, b: [2, 3], c: {d: [3, 4], e: 4}}
   let initial_copy = {a: 1, b: [2, 3], c: {d: [3, 4], e: 4}}
   const r = Ref.root(initial_state)
@@ -32,7 +32,9 @@ test('Dannelib', assert => {
   r_c_e.set(998)
   after('nested set', {a: 999, b: [2, 3], c: {d: [3, 4], e: 998}})
 
+  assert.assert([r_a_and_c_e.proj('a').get(), r_a_and_c_e.get()['a']].every(x => x == 999))
   r_a_and_c_e.set({a: 10, e: 20})
+  assert.assert([r_a_and_c_e.proj('a').get(), r_a_and_c_e.get()['a']].every(x => x == 10))
   after('record set', {a: 10, b: [2, 3], c: {d: [3, 4], e: 20}})
 
   const r_bs = r.proj('b')

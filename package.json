@@ -1,34 +1,49 @@
 {
-  "name": "dannelib-demo",
-  "license": "MIT",
+  "name": "projective",
   "version": "0.1.0",
+  "description": "A tiny library for pure, reactive and composable state.",
   "author": "Dan Rosén",
-  "description": "TodoMVC using dannelib",
-  "main": "./dist/bundle.js",
-  "repository": "https://github.com/danr/dannelib-todomvc.git/",
-  "dependencies": {
-    "snabbdom": "^0.7.0",
-    "todomvc-app-css": "^1.0.0",
-    "todomvc-common": "^1.0.1"
-  },
+  "license": "MIT",
+  "main": "projective.js",
+  "typings": "projective.d.ts",
+  "dependencies": {},
   "devDependencies": {
     "@types/tape": "^4.2.30",
-    "awesome-typescript-loader": "^3.0.3",
-    "css-loader": "^0.28.1",
-    "source-map-loader": "^0.1.5",
-    "style-loader": "^0.17.0",
+    "covert": "^1.1.0",
     "tap-diff": "^0.1.1",
     "tape": "^4.8.0",
     "ts-node": "^3.3.0",
-    "typescript": "2.4.2",
-    "uglifyjs-webpack-plugin": "^0.4.6",
-    "url-loader": "^0.5.8",
-    "webpack": "^3.7.1",
-    "webpack-dev-server": "2.3.0"
+    "typescript": "^2.4.2"
   },
   "scripts": {
-    "start": "./node_modules/.bin/webpack-dev-server --hot",
-    "build": "NODE_ENV=production webpack --display-optimization-bailout",
-    "test": "./node_modules/.bin/ts-node node_modules/.bin/tape test/*.ts | ./node_modules/.bin/tap-diff"
-  }
+    "pretest": "tsc test/*.ts",
+    "test": "tape test/*js | tap-diff",
+    "precoverage": "tsc test/*.ts",
+    "coverage": "covert test/*js",
+    "compile": "tsc"
+  },
+  "keywords": [
+    "state",
+    "store",
+    "pure",
+    "immutable",
+    "reactive",
+    "projective",
+    "functional",
+    "stream",
+    "redux",
+    "flux",
+    "elm"
+  ],
+  "directories": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danr/projective.git"
+  },
+  "bugs": {
+    "url": "https://github.com/danr/projective/issues"
+  },
+  "homepage": "https://github.com/danr/projective#readme"
 }

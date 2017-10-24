@@ -1,11 +1,11 @@
-# Dannelib TodoMVC demo
+# projective
 
-Dannelib is a minimalistic library for frontend state.
+`projective`: a tiny library for pure, reactive and composable state.
 
 ## The gist
 
 ```javascript
-import { Ref } from 'Dannelib'
+import { Ref } from 'projective'
 
 const increment = x => x + 1
 const decrement = x => x - 1

@@ -1,20 +1,14 @@
 
-type Transaction = (m: () => void) => void
-
-type OnChange = (k: Change) => () => void
-
-type Change = () => void
-
 /** Storing state */
 export class Ref<S> {
   private constructor(
     /** Start a new transaction: allows using set and modify many times,
     and only when the (top-level) transaction is finished listeners will be
     notified. */
-    public readonly transaction: Transaction,
+    public readonly transaction: (m: () => void) => void,
 
     /** React on changes. returns an unsubscribe function */
-    public readonly listen: OnChange,
+    public readonly listen: (k: () => void) => () => void,
 
     /** Get the current value
 
@@ -78,7 +72,7 @@ export class Ref<S> {
     /** Only notify on transactions that actually did set */
     let pending = false
     /** Listeners */
-    const listeners = new ListWithRemove<Change>()
+    const listeners = new ListWithRemove<() => void>()
     /** Notify listeners if applicable */
     function notify(): void {
       if (depth == 0 && pending) {

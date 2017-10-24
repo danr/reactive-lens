@@ -1,14 +1,16 @@
 {
     "compilerOptions": {
-        "outDir": "./dist/",
-        "sourceMap": false,
+        "module": "commonjs",
+        "target": "ES5",
+        "outDir": "./",
         "noImplicitAny": true,
-        "strict": true,
-        "moduleResolution": "node",
-        "allowUnreachableCode": true,
-        "target": "es5"
+        "sourceMap": true,
+        "strictNullChecks": true,
+        "declaration": true,
+        "removeComments": false,
+        "noUnusedLocals": true
     },
     "files": [
-        "./src/**/*"
+        "./src/projective.ts"
     ]
 }
