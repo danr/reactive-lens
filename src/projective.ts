@@ -170,8 +170,10 @@ export class Store<S> {
         } else {
           const ys = xs.slice()
           if (x !== undefined) {
-            // fill with undefined:
-            for (; ys.length < position; ys.push(undefined as any as A));
+            // pre-fill with undefined:
+            while (ys.length < position) {
+              ys.push(undefined as any as A)
+            }
             ys.push(x)
           }
           return inplace_rtrim(ys)
@@ -190,7 +192,6 @@ export class Store<S> {
   static each<A>(store: Store<A[]>): Store<A | undefined>[] {
     return store.get().map((_, i) => Store.index(store, i))
   }
-
 
   /** Paginate a store into equal pieces of a chunk size, which is either constant or calculated from the page index */
   static paginate<A>(store: Store<A[]>, chunk_size: number | ((i: number) => number)): Store<A[][]> {
@@ -212,36 +213,36 @@ export class Store<S> {
 }
 
 class ListWithRemove<A> {
-    private next_unique = 0
-    private order = [] as (string[] | null)
-    private dict = {} as Record<string, A>
+  private next_unique = 0
+  private order = [] as (string[] | null)
+  private dict = {} as Record<string, A>
 
-    constructor() {}
+  constructor() {}
 
-    /** Push a new element, returns the delete function */
-    public push(a: A): () => void {
-      const id = this.next_unique++ + ''
-      this.dict[id] = a
-      if (this.order != null) {
-        this.order.push(id)
-      }
-      return () => {
-        delete this.dict[id]
-        this.order = null
-      }
+  /** Push a new element, returns the delete function */
+  public push(a: A): () => void {
+    const id = this.next_unique++ + ''
+    this.dict[id] = a
+    if (this.order != null) {
+      this.order.push(id)
     }
-
-    /** Iterate over the elements */
-    public iter(f: (a: A) => void): void {
-      if (this.order == null) {
-        const cmp = (a: string, b: string) => parseInt(a) - parseInt(b)
-        this.order = Object.keys(this.dict).sort(cmp)
-      }
-      this.order.map(id => {
-        if (id in this.dict) {
-          f(this.dict[id])
-        }
-      })
+    return () => {
+      delete this.dict[id]
+      this.order = null
     }
   }
+
+  /** Iterate over the elements */
+  public iter(f: (a: A) => void): void {
+    if (this.order == null) {
+      const cmp = (a: string, b: string) => parseInt(a) - parseInt(b)
+      this.order = Object.keys(this.dict).sort(cmp)
+    }
+    this.order.map(id => {
+      if (id in this.dict) {
+        f(this.dict[id])
+      }
+    })
+  }
+}
 
