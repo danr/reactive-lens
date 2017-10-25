@@ -5,18 +5,18 @@
 ## The gist
 
 ```javascript
-import { Ref } from 'projective'
+import { Store } from 'projective'
 
 const increment = x => x + 1
 const decrement = x => x - 1
 
-const ref = Ref.root({left: 0, right: 0})
+const store = Store.init({left: 0, right: 0})
 
-ref.on(x => console.log(x))
+store.on(x => console.log(x))
 
-ref.proj('left').modify(increment)
-ref.proj('right').modify(increment)
-ref.proj('left').modify(decrement)
+store.at('left').modify(increment)
+store.at('right').modify(increment)
+store.at('left').modify(decrement)
 ```
 
 That's it!
