@@ -1,6 +1,6 @@
 
 /** Storing state */
-export class Ref<S> {
+export class Store<S> {
   private constructor(
     /** Start a new transaction: allows using set and modify many times,
     and only when the (top-level) transaction is finished listeners will be
@@ -24,17 +24,17 @@ export class Ref<S> {
     return this.listen(() => k(this.get()))
   }
 
-  /** Modify the value in the reference
+  /** Modify the value in the store
 
   Note: return a new value (do not mutate it) */
   modify(f: (s: S) => S): void {
     return this.set(f(this.get()))
   }
 
-  /** Make a new reference by projecting a subfield.
+  /** Make a new store by projecting a subfield.
 
   Note: use only when S is actually an object, which always has the key k. */
-  at<K extends keyof S>(k: K): Ref<S[K]> {
+  at<K extends keyof S>(k: K): Store<S[K]> {
     return this.lens(s => s[k], (s, v) => ({...(s as any), [k as string]: v}))
                                             // unsafe cast
                                                            // safe cast
@@ -44,7 +44,7 @@ export class Ref<S> {
 
   Note: the key may be missing from the record.
   Note: setting the value to undefined removes the key from the record. */
-  key<K extends keyof S>(k: K): Ref<S[K] | undefined> {
+  key<K extends keyof S>(k: K): Store<S[K] | undefined> {
     return this.lens(
       x => x[k],
       (s, v) => {
@@ -64,31 +64,31 @@ export class Ref<S> {
   }
 
   /** Refer to a default value instead of undefined */
-  static def<A>(ref: Ref<A | undefined>, missing: A): Ref<A> {
-    return ref.iso(
+  static def<A>(store: Store<A | undefined>, missing: A): Store<A> {
+    return store.iso(
       a => a === undefined ? missing : a,
       a => a === missing ? undefined : a)
   }
 
-  /** Transform a reference via an isomorphism
+  /** Transform a store via an isomorphism
 
   Note: requires that for all s and t we have f(g(t)) = t and g(f(s)) = s */
-  iso<T>(f: (s: S) => T, g: (t: T) => S): Ref<T> {
-    return Ref.sub(
+  iso<T>(f: (s: S) => T, g: (t: T) => S): Store<T> {
+    return Store.sub(
       this,
       () => f(this.get()),
       (t: T) => this.set(g(t))
     )
   }
 
-  /** Make a derived reference */
-  lens<T>(project: (s: S) => T, inject: (s: S, t: T) => S): Ref<T> {
+  /** Make a derived store */
+  lens<T>(project: (s: S) => T, inject: (s: S, t: T) => S): Store<T> {
     return this.iso(project, t => inject(this.get(), t))
   }
 
-  /** Make a subreference with respect to some base reference */
-  static sub<B, T>(base: Ref<B>, get: () => T, set: (s: T) => void): Ref<T> {
-    return new Ref(
+  /** Make a substore with respect to some base store */
+  static sub<B, T>(base: Store<B>, get: () => T, set: (s: T) => void): Store<T> {
+    return new Store(
       base.transaction,
       base.listen,
       get,
@@ -96,8 +96,8 @@ export class Ref<S> {
     )
   }
 
-  /** Make the root reference */
-  static init<S>(s0: S): Ref<S> {
+  /** Make the root store */
+  static init<S>(s0: S): Store<S> {
     /** Current state */
     let s = s0
     /** Transaction depth, only notify when setting at depth 0 */
@@ -126,26 +126,26 @@ export class Ref<S> {
         pending = true
         notify()
       }
-    return new Ref(transaction, k => listeners.push(k), () => s, set)
+    return new Store(transaction, k => listeners.push(k), () => s, set)
   }
 
   /** Make a new reference from many in a record */
-  static record<R>(refs: {[P in keyof R]: Ref<R[P]>}): Ref<R> {
-    for (const base_key in refs) {
-      const ref = refs[base_key]
-      return Ref.sub(
-        ref,
+  static record<R>(stores: {[P in keyof R]: Store<R[P]>}): Store<R> {
+    for (const base_key in stores) {
+      const store = stores[base_key]
+      return Store.sub(
+        store,
         () => {
           const ret = {} as R
-          for (let k in refs) {
-            ret[k] = refs[k].get()
+          for (let k in stores) {
+            ret[k] = stores[k].get()
           }
           return ret
         },
         (v: R) => {
-          ref.transaction(() => {
-            for (let k in refs) {
-              refs[k].set(v[k])
+          store.transaction(() => {
+            for (let k in stores) {
+              stores[k].set(v[k])
             }
           })
         }
@@ -155,8 +155,8 @@ export class Ref<S> {
   }
 
   /** Make a reference to a particular index in an array */
-  static index<A>(ref: Ref<A[]>, position: number): Ref<A | undefined> {
-    return ref.lens(
+  static index<A>(store: Store<A[]>, position: number): Store<A | undefined> {
+    return store.lens(
       xs => xs[position],
       (xs, x) => {
         if (position < xs.length) {
@@ -186,15 +186,15 @@ export class Ref<S> {
     }
   }
 
-  /** Get references to each position currently in the array */
-  static each<A>(ref: Ref<A[]>): Ref<A | undefined>[] {
-    return ref.get().map((_, i) => Ref.index(ref, i))
+  /** Get stores to each position currently in the array */
+  static each<A>(store: Store<A[]>): Store<A | undefined>[] {
+    return store.get().map((_, i) => Store.index(store, i))
   }
 
 
-  /** Paginate a reference into equal pieces of a chunk size, which is either constant or calculated from the page index */
-  static paginate<A>(ref: Ref<A[]>, chunk_size: number | ((i: number) => number)): Ref<A[][]> {
-    return ref.iso(
+  /** Paginate a store into equal pieces of a chunk size, which is either constant or calculated from the page index */
+  static paginate<A>(store: Store<A[]>, chunk_size: number | ((i: number) => number)): Store<A[][]> {
+    return store.iso(
       chunk,
       xss => ([] as A[]).concat(...xss)
     )
