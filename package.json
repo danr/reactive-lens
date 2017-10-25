@@ -1,11 +1,11 @@
 {
-  "name": "projective",
+  "name": "reactive-lens",
   "version": "0.1.0",
   "description": "A tiny library for pure, reactive and composable state.",
   "author": "Dan Rosén",
   "license": "MIT",
-  "main": "projective.js",
-  "typings": "projective.d.ts",
+  "main": "reactive-lens.js",
+  "typings": "reactive-lens.d.ts",
   "dependencies": {},
   "devDependencies": {
     "@types/tape": "^4.2.30",
@@ -28,7 +28,7 @@
     "pure",
     "immutable",
     "reactive",
-    "projective",
+    "lens",
     "functional",
     "stream",
     "redux",
@@ -40,14 +40,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/danr/projective.git"
+    "url": "git+https://github.com/danr/reactive-lens.git"
   },
   "bugs": {
-    "url": "https://github.com/danr/projective/issues"
+    "url": "https://github.com/danr/reactive-lens/issues"
   },
-  "homepage": "https://github.com/danr/projective#readme",
+  "homepage": "https://github.com/danr/reactive-lens#readme",
   "files": [
-    "projective.js",
-    "projective.d.ts"
+    "reactive-lens.js",
+    "reactive-lens.d.ts"
   ]
 }

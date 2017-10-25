@@ -11,6 +11,6 @@
         "noUnusedLocals": true
     },
     "files": [
-        "./src/projective.ts"
+        "./src/reactive-lens.ts"
     ]
 }

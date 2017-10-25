@@ -1,4 +1,4 @@
-import { Store } from './../src/projective'
+import { Store } from './../src/reactive-lens'
 import * as test from "tape"
 
 function reverse<A>(xs: A[]): A[] {
@@ -40,7 +40,7 @@ function init<S>(s0: S, assert: test.Test): {store: Store<S>, after(s: string, x
   }
 }
 
-test('projective', assert => {
+test('reactive-lens', assert => {
   let initial_state = {a: 1, b: [2, 3], c: {d: [3, 4], e: 4}}
   let initial_copy = {a: 1, b: [2, 3], c: {d: [3, 4], e: 4}}
   const {store, after} = init(initial_state, assert)

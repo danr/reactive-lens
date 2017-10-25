@@ -1,6 +1,6 @@
-projective.js
-projective.js.map
-projective.d.ts
-src/projective.js
-test/projective.test.js
+reactive-lens.js
+reactive-lens.js.map
+reactive-lens.d.ts
+src/reactive-lens.js
+test/reactive-lens.test.js
 node_modules

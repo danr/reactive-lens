@@ -1,11 +1,11 @@
-# projective
+# reactive-lens
 
-`projective`: a tiny library for pure, reactive and composable state.
+`reactive-lens`: a tiny library for pure, reactive and composable state.
 
 ## The gist
 
 ```javascript
-import { Store } from 'projective'
+import { Store } from 'reactive-lens'
 
 const increment = x => x + 1
 const decrement = x => x - 1
