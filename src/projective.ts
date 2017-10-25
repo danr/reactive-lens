@@ -8,7 +8,7 @@ export class Ref<S> {
     public readonly transaction: (m: () => void) => void,
 
     /** React on changes. returns an unsubscribe function */
-    public readonly listen: (k: () => void) => () => void,
+    private readonly listen: (k: () => void) => () => void,
 
     /** Get the current value
 
@@ -33,13 +33,41 @@ export class Ref<S> {
 
   /** Make a new reference by projecting a subfield.
 
-  Note: use only when S is actually an object */
-  proj<K extends keyof S>(k: K): Ref<S[K]> {
-    return Ref.sub(
-      this,
-      () => this.get()[k],
-      (v: S[K]) => this.set({...this.get() as any, [k as string]: v}),
+  Note: use only when S is actually an object, which always has the key k. */
+  at<K extends keyof S>(k: K): Ref<S[K]> {
+    return this.lens(s => s[k], (s, v) => ({...(s as any), [k as string]: v}))
+                                            // unsafe cast
+                                                           // safe cast
+  }
+
+  /** Make a reference at a particular key in a record.
+
+  Note: the key may be missing from the record.
+  Note: setting the value to undefined removes the key from the record. */
+  key<K extends keyof S>(k: K): Ref<S[K] | undefined> {
+    return this.lens(
+      x => x[k],
+      (s, v) => {
+        // as string: safe cast
+        // as any: https://github.com/Microsoft/TypeScript/issues/14409
+        if (v == undefined) {
+          const {[k as string]: _, ...s2} = s as any
+          return s2
+        } else {
+          return {
+            ...(s as any),
+            [k as string]: v
+          }
+        }
+      }
     )
+  }
+
+  /** Refer to a default value instead of undefined */
+  static def<A>(ref: Ref<A | undefined>, missing: A): Ref<A> {
+    return ref.iso(
+      a => a === undefined ? missing : a,
+      a => a === missing ? undefined : a)
   }
 
   /** Transform a reference via an isomorphism
@@ -53,6 +81,11 @@ export class Ref<S> {
     )
   }
 
+  /** Make a derived reference */
+  lens<T>(project: (s: S) => T, inject: (s: S, t: T) => S): Ref<T> {
+    return this.iso(project, t => inject(this.get(), t))
+  }
+
   /** Make a subreference with respect to some base reference */
   static sub<B, T>(base: Ref<B>, get: () => T, set: (s: T) => void): Ref<T> {
     return new Ref(
@@ -64,7 +97,7 @@ export class Ref<S> {
   }
 
   /** Make the root reference */
-  static root<S>(s0: S): Ref<S> {
+  static init<S>(s0: S): Ref<S> {
     /** Current state */
     let s = s0
     /** Transaction depth, only notify when setting at depth 0 */
@@ -96,102 +129,119 @@ export class Ref<S> {
     return new Ref(transaction, k => listeners.push(k), () => s, set)
   }
 
-}
-
-/** Make a new refence from many in a record */
-export function record<R>(refs: {[P in keyof R]: Ref<R[P]>}): Ref<R> {
-  for (const base_key in refs) {
-    const ref = refs[base_key]
-    return Ref.sub(
-      ref,
-      () => {
-        const ret = {} as R
-        for (let k in refs) {
-          ret[k] = refs[k].get()
-        }
-        return ret
-      },
-      (v: R) => {
-        ref.transaction(() => {
+  /** Make a new reference from many in a record */
+  static record<R>(refs: {[P in keyof R]: Ref<R[P]>}): Ref<R> {
+    for (const base_key in refs) {
+      const ref = refs[base_key]
+      return Ref.sub(
+        ref,
+        () => {
+          const ret = {} as R
           for (let k in refs) {
-            refs[k].set(v[k])
+            ret[k] = refs[k].get()
           }
-        })
+          return ret
+        },
+        (v: R) => {
+          ref.transaction(() => {
+            for (let k in refs) {
+              refs[k].set(v[k])
+            }
+          })
+        }
+      )
+    }
+    throw "Empty record"
+  }
+
+  /** Make a reference to a particular index in an array */
+  static index<A>(ref: Ref<A[]>, position: number): Ref<A | undefined> {
+    return ref.lens(
+      xs => xs[position],
+      (xs, x) => {
+        if (position < xs.length) {
+          const a = xs.slice(0, position)
+          const z = xs.slice(position + 1)
+          if (x === undefined) {
+            return inplace_rtrim([...a, ...z])
+          } else {
+            return inplace_rtrim([...a, x, ...z])
+          }
+        } else {
+          const ys = xs.slice()
+          if (x !== undefined) {
+            // fill with undefined:
+            for (; ys.length < position; ys.push(undefined as any as A));
+            ys.push(x)
+          }
+          return inplace_rtrim(ys)
+        }
       }
     )
-  }
-  throw "Empty record"
-}
-
-/** Make a reference to a particular index in an array */
-export function at<A>(ref: Ref<A[]>, index: number): Ref<A> {
-  return Ref.sub(
-    ref,
-    () => ref.get()[index],
-    (v) => {
-      const now = ref.get()
-      if (index < now.length) {
-        const a = now.slice(0, index)
-        const z = now.slice(index + 1)
-        ref.set([...a, v, ...z])
+    function inplace_rtrim(ys: A[]): A[] {
+      while (ys.length > 0 && ys[ys.length - 1] === undefined) {
+        ys.pop()
       }
+      return ys
     }
-  )
-}
-
-/** Get references to all indexes in an array */
-export function views<A>(ref: Ref<A[]>): Ref<A>[] {
-  return ref.get().map((_, i) => at(ref, i))
-}
-
-/** Helper function to paginate */
-function chunk<A>(xs: A[], chunk_size: number): A[][] {
-  const out = [] as A[][]
-  for (let i = 0; i < xs.length; i += chunk_size) {
-    out.push(xs.slice(i, i + chunk_size))
   }
-  return out
-}
 
-/** Paginate a reference into equal pieces of a chunk size */
-export function paginate<A>(r: Ref<A[]>, chunk_size: number): Ref<A[][]> {
-  return r.iso(
-    xs => chunk(xs, chunk_size),
-    xss => ([] as A[]).concat(...xss)
-  )
+  /** Get references to each position currently in the array */
+  static each<A>(ref: Ref<A[]>): Ref<A | undefined>[] {
+    return ref.get().map((_, i) => Ref.index(ref, i))
+  }
+
+
+  /** Paginate a reference into equal pieces of a chunk size, which is either constant or calculated from the page index */
+  static paginate<A>(ref: Ref<A[]>, chunk_size: number | ((i: number) => number)): Ref<A[][]> {
+    return ref.iso(
+      chunk,
+      xss => ([] as A[]).concat(...xss)
+    )
+    function chunk<A>(xs: A[]): A[][] {
+      const out = [] as A[][]
+      const f = typeof chunk_size == 'number' ? (_: number) => chunk_size : chunk_size
+      for (let i = 0, j = 0; i < xs.length; j++) {
+        const n = f(j)
+        out.push(xs.slice(i, i + n))
+        i += n
+      }
+      return out
+    }
+  }
 }
 
 class ListWithRemove<A> {
-  private next_unique = 0
-  private order = [] as (string[] | null)
-  private dict = {} as Record<string, A>
+    private next_unique = 0
+    private order = [] as (string[] | null)
+    private dict = {} as Record<string, A>
 
-  constructor() {}
+    constructor() {}
 
-  /** Push a new element, returns the delete function */
-  public push(a: A): () => void {
-    const id = this.next_unique++ + ''
-    this.dict[id] = a
-    if (this.order != null) {
-      this.order.push(id)
-    }
-    return () => {
-      delete this.dict[id]
-      this.order = null
-    }
-  }
-
-  /** Iterate over the elements */
-  public iter(f: (a: A) => void): void {
-    if (this.order == null) {
-      const cmp = (a: string, b: string) => parseInt(a) - parseInt(b)
-      this.order = Object.keys(this.dict).sort(cmp)
-    }
-    this.order.map(id => {
-      if (id in this.dict) {
-        f(this.dict[id])
+    /** Push a new element, returns the delete function */
+    public push(a: A): () => void {
+      const id = this.next_unique++ + ''
+      this.dict[id] = a
+      if (this.order != null) {
+        this.order.push(id)
       }
-    })
+      return () => {
+        delete this.dict[id]
+        this.order = null
+      }
+    }
+
+    /** Iterate over the elements */
+    public iter(f: (a: A) => void): void {
+      if (this.order == null) {
+        const cmp = (a: string, b: string) => parseInt(a) - parseInt(b)
+        this.order = Object.keys(this.dict).sort(cmp)
+      }
+      this.order.map(id => {
+        if (id in this.dict) {
+          f(this.dict[id])
+        }
+      })
+    }
   }
-}
 
