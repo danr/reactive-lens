@@ -4,30 +4,30 @@ export interface Lens<S, T> {
   set(s: S, t: T): S
 }
 
-/* lens laws
+/** Store for some state
 
-  x.set(x.get()).get() = x.get()
+Store laws (assuming no listeners):
 
-  // the size-changing ones violate these:
+    s.set(a).get() = a
 
-  x.set(a).set(b).get() = x.set(a).get()
+    s.set(s.get()).get() = s.get()
 
-  x.set(a).get() = a
-
-  // introduce traversals?
+    s.set(a).set(b).get() = s.set(b).get()
 
 */
-
-/** Store for some state */
 export interface Store<S> {
   /** Get the current value (which must not be mutated) */
   get(): S
 
-  /** Set the value */
-  set(s: S): void
+  /** Set the value
 
-  /** Modify the value in the store (must not use mutation: return a new value) */
-  modify(f: (s: S) => S): void
+  Returns itself. */
+  set(s: S): Store<S>
+
+  /** Modify the value in the store (must not use mutation: construct a new value)
+
+  Returns itself. */
+  modify(f: (s: S) => S): Store<S>
 
   /** React on changes. Returns an unsubscribe function. */
   on(k: (s: S) => void): () => void
@@ -62,59 +62,20 @@ export interface ReactiveLensesAPI {
   /** Make a new store a record of stores */
   record<R>(stores: {[P in keyof R]: Store<R[P]>}): Store<R>
 
-  /** Get stores for each position currently in the array */
-  each<A>(store: Store<A[]>): Store<A | undefined>[]
+  /** Get partial stores for each position currently in the array */
+  each<A>(store: Store<A[]>): Store<A>[]
 
   /** Set using an array method (purity is ensured because the spine is copied before running the function) */
   arr<A, K extends keyof A[]>(store: Store<A[]>, k: K): A[][K]
 
-  /** Lens to a subarray */
-  subarray<A>(bounds: (length: number) => Bounds): Lens<A[], A[]>
-
-  /** Lens to the first N elements
-
-  violates lens laws if you set anything but N elements:
-
-  x.via(first(1)).set([2,3]).get() = [2] /= [2,3]
-
-     x.via(first(1)).set([2,3]).set([5,4]).get() = [5,4,3,...]
-             /= x.via(first(1)).set([5,4]).get() = [5,4,...]
-
-  (not idempotent)
-
-  could pad with undefined and drop excess: lens again
-
-  cannot tell if I'm a fixed-length array or dynamically sized array
-
-  should probably just stop having references to array elements (they're essentially clunky eithers)
-
-  */
-  first<A>(N: number): Lens<A[], A[]>,
-
-  /** Lens to the last N elements */
-  last<A>(N: number): Lens<A[], A[]>,
-
-  /** Lens to all but the first N elements */
-  drop<A>(N: number): Lens<A[], A[]>,
-
-  /** Lens to all but the last N elements  */
-  drop_end<A>(N: number): Lens<A[], A[]>,
-
-  /** Lens which paginates a store into equal pieces of a chunk size */
-  paginate<A>(chunk_size: number): Lens<A[], A[][]>
-
-  /** Lens which paginate a store into piece sizes calculated from the page index */
-  paginate<A>(chunk_size: ((i: number) => number)): Lens<A[], A[][]>
-
   /** Lens which refer to a default value instead of undefined */
   def<A>(missing: A): Lens<A | undefined, A>
 
-  /** Lens to a particular index in an array
+  /** Partial lens to a particular index in an array
 
-  Setting to undefined violates lens laws if it means remove it:
-  must mean just put this value to undefined
+  Note: an exception is thrown if you look outside the array.
   */
-  index<A>(position: number): Lens<A[], A | undefined>
+  index<A>(position: number): Lens<A[], A>
 
   /** Make a lens from a getter and setter */
   lens<S, T>(get: (s: S) => T, set: (s: S, t: T) => S): Lens<S, T>
@@ -132,6 +93,9 @@ export interface ReactiveLensesAPI {
   Note: the key may be missing from the record.
   Note: setting the value to undefined removes the key from the record. */
   key<S, K extends keyof S>(k: K): Lens<S, S[K] | undefined>
+
+  /** Compose two lenses */
+  via<S,T,U>(lens1: Lens<S, T>, lens2: Lens<T, U>): Lens<S, U>
 }
 
 class StoreClass<S> implements Store<S> {
@@ -142,7 +106,7 @@ class StoreClass<S> implements Store<S> {
 
     public readonly get: () => S,
 
-    public readonly set: (s: S) => void)
+    private readonly _set: (s: S) => void)
   { }
 
   static init<S>(s0: S): Store<S> {
@@ -177,8 +141,14 @@ class StoreClass<S> implements Store<S> {
     return new StoreClass(transaction, k => listeners.push(k), () => s, set)
   }
 
-  modify(f: (s: S) => S): void {
-    return this.set(f(this.get()))
+  set(s: S): Store<S> {
+    this._set(s)
+    return this
+  }
+
+  modify(f: (s: S) => S): Store<S> {
+    this.set(f(this.get()))
+    return this
   }
 
   on(k: (s: S) => void): () => void {
@@ -235,8 +205,13 @@ function key<S, K extends keyof S>(k: K): Lens<S, S[K] | undefined> {
       // as string: safe cast
       // as any: https://github.com/Microsoft/TypeScript/issues/14409
       if (v == undefined) {
-        const {[k as string]: _, ...s2} = s as any
-        return s2
+        const copy = {} as S
+        for (let i in s) {
+          if (i != k) {
+            copy[i] = s[i]
+          }
+        }
+        return copy
       } else {
         return {
           ...(s as any),
@@ -273,7 +248,7 @@ function record<R>(stores: {[P in keyof R]: Store<R[P]>}): Store<R> {
       }
     )
   }
-  throw "Empty record"
+  throw 'Empty record'
 }
 
 function via<S,T,U>(lens1: Lens<S, T>, lens2: Lens<T, U>): Lens<S, U> {
@@ -283,69 +258,27 @@ function via<S,T,U>(lens1: Lens<S, T>, lens2: Lens<T, U>): Lens<S, U> {
   )
 }
 
-function index<A>(position: number): Lens<A[], A | undefined> {
+function index<A>(position: number): Lens<A[], A> {
   return lens(
-    xs => xs[position],
-    (xs, x) => {
-      if (position < xs.length) {
-        const a = xs.slice(0, position)
-        const z = xs.slice(position + 1)
-        if (x === undefined) {
-          return inplace_rtrim([...a, ...z])
-        } else {
-          return inplace_rtrim([...a, x, ...z])
-        }
+    xs => {
+      if (position < 0 || position >= xs.length) {
+        throw 'Out of bounds'
       } else {
-        const ys = xs.slice()
-        if (x !== undefined) {
-          // pre-fill with undefined:
-          while (ys.length < position) {
-            ys.push(undefined as any as A)
-          }
-          ys.push(x)
-        }
-        return inplace_rtrim(ys)
+        return xs[position]
       }
-    }
-  )
-  function inplace_rtrim(ys: A[]): A[] {
-    while (ys.length > 0 && ys[ys.length - 1] === undefined) {
-      ys.pop()
-    }
-    return ys
-  }
+    },
+    (xs, x) => {
+      if (position < 0 || position >= xs.length) {
+        throw 'Out of bounds'
+      }
+      const ys = xs.slice()
+      ys[position] = x
+      return ys
+    })
 }
 
-/*
-function index<A>(position: number): Lens<A[], A | undefined> {
-  return via(
-    subarray((n: number) => bounds(0, position, n)),
-    iso(
-      xs => xs.length > 0 ? xs[0] : undefined,
-      x => x === undefined ? [] : [x]
-    ))
-}
-*/
-
-function each<A>(store: Store<A[]>): Store<A | undefined>[] {
+function each<A>(store: Store<A[]>): Store<A>[] {
   return store.get().map((_, i) => store.via(index(i)))
-}
-
-function paginate<A>(chunk_size: number | ((i: number) => number)): Lens<A[], A[][]> {
-  return iso(
-    chunk,
-    xss => ([] as A[]).concat(...xss)
-  )
-  function chunk<A>(xs: A[]): A[][] {
-    const out = [] as A[][]
-    const f = typeof chunk_size == 'number' ? (_: number) => chunk_size : chunk_size
-    for (let i = 0, j = 0; i < xs.length; j++) {
-      const n = f(j)
-      out.push(xs.slice(i, i + n))
-      i += n
-    }
-    return out
-  }
 }
 
 function arr<A, K extends keyof Array<A>>(store: Store<Array<A>>, k: K): Array<A>[K] {
@@ -357,50 +290,14 @@ function arr<A, K extends keyof Array<A>>(store: Store<Array<A>>, k: K): Array<A
   }
 }
 
-export interface Bounds {
-  begin: number,
-  end: number
-}
-
-function subarray<A>(bounds: (length: number) => Bounds): Lens<A[], A[]> {
-  return lens(
-    xs => {
-      const {begin, end} = bounds(xs.length)
-      return xs.slice(begin, end)
-    },
-    (xs, ys) => {
-      const {begin, end} = bounds(xs.length)
-      const zs = xs.slice()
-      zs.splice(begin, end - begin, ...ys)
-      return zs
-    }
-  )
-}
-
-const bounded =
-  (l: number, x: number, u: number) =>
-  Math.max(Math.min(l, u), Math.min(x, Math.max(l, u)))
-
-const bounds =
-  (n: number, begin: number, end: number) => ({
-    begin: bounded(0, begin, n),
-    end: bounded(0, end, n)
-  })
-
-
 export const Store: ReactiveLensesAPI = {
   init: StoreClass.init,
-  paginate,
   def,
   record,
   index,
   each,
   arr,
-  subarray,
-  first: (N: number) => subarray((n: number) => bounds(n, 0, N)),
-  last: (N: number) => subarray((n: number) => bounds(n, n-N, n)),
-  drop: (N: number) => subarray((n: number) => bounds(n, N, n)),
-  drop_end: (N: number) => subarray((n: number) => bounds(n, 0, n-N)),
+  via,
   lens,
   iso,
   at,
