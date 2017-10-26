@@ -200,7 +200,7 @@ function key<S, K extends keyof S>(k: K): Lens<S, S[K] | undefined> {
     (s, v) => {
       // as string: safe cast
       // as any: https://github.com/Microsoft/TypeScript/issues/14409
-      if (v == undefined) {
+      if (v === undefined) {
         const copy = {} as S
         for (let i in s) {
           if (i != k) {
