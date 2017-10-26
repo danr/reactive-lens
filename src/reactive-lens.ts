@@ -59,7 +59,7 @@ export interface ReactiveLensesAPI {
   /** Make the root store */
   init<S>(s0: S): Store<S>
 
-  /** Make a new store a record of stores */
+  /** Make a new store from a record of stores */
   record<R>(stores: {[P in keyof R]: Store<R[P]>}): Store<R>
 
   /** Get partial stores for each position currently in the array */
@@ -164,14 +164,10 @@ class StoreClass<S> implements Store<S> {
     )
   }
 
-  private lens<T>(get: (s: S) => T, set: (s: S, t: T) => S): Store<T> {
-    return this.substore(
-      () => get(this.get()),
-      (t: T) => this.set(set(this.get(), t)))
-  }
-
   via<T>(lens: Lens<S, T>) {
-    return this.lens(lens.get, lens.set)
+    return this.substore(
+      () => lens.get(this.get()),
+      (t: T) => this.set(lens.set(this.get(), t)))
   }
 
   at<K extends keyof S>(k: K): Store<S[K]> {
@@ -258,21 +254,18 @@ function via<S,T,U>(lens1: Lens<S, T>, lens2: Lens<T, U>): Lens<S, U> {
   )
 }
 
-function index<A>(position: number): Lens<A[], A> {
+function index<A>(i: number): Lens<A[], A> {
+  const within = (xs: A[]) => {
+    if (i < 0 || i >= xs.length) {
+      throw 'Out of bounds'
+    }
+  }
   return lens(
-    xs => {
-      if (position < 0 || position >= xs.length) {
-        throw 'Out of bounds'
-      } else {
-        return xs[position]
-      }
-    },
+    xs => (within(xs), xs[i]),
     (xs, x) => {
-      if (position < 0 || position >= xs.length) {
-        throw 'Out of bounds'
-      }
+      within(xs)
       const ys = xs.slice()
-      ys[position] = x
+      ys[i] = x
       return ys
     })
 }
