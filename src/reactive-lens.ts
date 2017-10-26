@@ -19,6 +19,87 @@ export class Store<S> {
     public readonly set: (s: S) => void)
   { }
 
+  /** Make the root store */
+  static init<S>(s0: S): Store<S> {
+    /** Current state */
+    let s = s0
+    /** Transaction depth, only notify when setting at depth 0 */
+    let depth = 0
+    /** Only notify on transactions that actually did set */
+    let pending = false
+    /** Listeners */
+    const listeners = ListWithRemove<() => void>()
+    /** Notify listeners if applicable */
+    function notify(): void {
+      if (depth == 0 && pending) {
+        pending = false
+        // must use a transaction because listeners might set the state again
+        transaction(() => listeners.iter(k => k()))
+      }
+    }
+    function transaction(m: () => void) {
+      depth++
+      m()
+      depth--
+      notify()
+    }
+    const set =
+      (v: S) => {
+        s = v
+        pending = true
+        notify()
+      }
+    return new Store(transaction, k => listeners.push(k), () => s, set)
+
+    interface ListWithRemove<A> {
+      push(a: A): () => void,
+      iter(f: (a: A) => void): void
+    }
+
+    function ListWithRemove<A>(): ListWithRemove<A> {
+      const dict = {} as Record<string, A>
+      let order = [] as (string[] | null)
+      let next_unique = 0
+
+      /** Push a new element, returns the delete function */
+      return {
+        push(a) {
+          const id = next_unique++ + ''
+          dict[id] = a
+          if (order != null) {
+            order.push(id)
+          }
+          return () => {
+            delete dict[id]
+            order = null
+          }
+        },
+        iter(f) {
+          if (order == null) {
+            const cmp = (a: string, b: string) => parseInt(a) - parseInt(b)
+            order = Object.keys(dict).sort(cmp)
+          }
+          order.map(id => {
+            if (id in dict) {
+              f(dict[id])
+            }
+          })
+        }
+      }
+    }
+
+  }
+
+  /** Make a substore with respect to some base store */
+  static sub<B, T>(base: Store<B>, get: () => T, set: (s: T) => void): Store<T> {
+    return new Store(
+      base.transaction,
+      base.listen,
+      get,
+      set
+    )
+  }
+
   /** React on changes. returns an unsubscribe function */
   on(k: (s: S) => void): () => void {
     return this.listen(() => k(this.get()))
@@ -63,13 +144,6 @@ export class Store<S> {
     )
   }
 
-  /** Refer to a default value instead of undefined */
-  static def<A>(store: Store<A | undefined>, missing: A): Store<A> {
-    return store.iso(
-      a => a === undefined ? missing : a,
-      a => a === missing ? undefined : a)
-  }
-
   /** Transform a store via an isomorphism
 
   Note: requires that for all s and t we have f(g(t)) = t and g(f(s)) = s */
@@ -86,48 +160,13 @@ export class Store<S> {
     return this.iso(project, t => inject(this.get(), t))
   }
 
-  /** Make a substore with respect to some base store */
-  static sub<B, T>(base: Store<B>, get: () => T, set: (s: T) => void): Store<T> {
-    return new Store(
-      base.transaction,
-      base.listen,
-      get,
-      set
-    )
-  }
 
-  /** Make the root store */
-  static init<S>(s0: S): Store<S> {
-    /** Current state */
-    let s = s0
-    /** Transaction depth, only notify when setting at depth 0 */
-    let depth = 0
-    /** Only notify on transactions that actually did set */
-    let pending = false
-    /** Listeners */
-    const listeners = new ListWithRemove<() => void>()
-    /** Notify listeners if applicable */
-    function notify(): void {
-      if (depth == 0 && pending) {
-        pending = false
-        // must use a transaction because listeners might set the state again
-        transaction(() => listeners.iter(k => k()))
-      }
-    }
-    function transaction(m: () => void) {
-      depth++
-      m()
-      depth--
-      notify()
-    }
-    const set =
-      (v: S) => {
-        s = v
-        pending = true
-        notify()
-      }
-    return new Store(transaction, k => listeners.push(k), () => s, set)
-  }
+/** Refer to a default value instead of undefined */
+static def<A>(store: Store<A | undefined>, missing: A): Store<A> {
+  return store.iso(
+    a => a === undefined ? missing : a,
+    a => a === missing ? undefined : a)
+}
 
   /** Make a new reference from many in a record */
   static record<R>(stores: {[P in keyof R]: Store<R[P]>}): Store<R> {
@@ -209,40 +248,6 @@ export class Store<S> {
       }
       return out
     }
-  }
-}
-
-class ListWithRemove<A> {
-  private next_unique = 0
-  private order = [] as (string[] | null)
-  private dict = {} as Record<string, A>
-
-  constructor() {}
-
-  /** Push a new element, returns the delete function */
-  public push(a: A): () => void {
-    const id = this.next_unique++ + ''
-    this.dict[id] = a
-    if (this.order != null) {
-      this.order.push(id)
-    }
-    return () => {
-      delete this.dict[id]
-      this.order = null
-    }
-  }
-
-  /** Iterate over the elements */
-  public iter(f: (a: A) => void): void {
-    if (this.order == null) {
-      const cmp = (a: string, b: string) => parseInt(a) - parseInt(b)
-      this.order = Object.keys(this.dict).sort(cmp)
-    }
-    this.order.map(id => {
-      if (id in this.dict) {
-        f(this.dict[id])
-      }
-    })
   }
 }
 
