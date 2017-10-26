@@ -4,6 +4,20 @@ export interface Lens<S, T> {
   set(s: S, t: T): S
 }
 
+/* lens laws
+
+  x.set(x.get()).get() = x.get()
+
+  // the size-changing ones violate these:
+
+  x.set(a).set(b).get() = x.set(a).get()
+
+  x.set(a).get() = a
+
+  // introduce traversals?
+
+*/
+
 /** Store for some state */
 export interface Store<S> {
   /** Get the current value (which must not be mutated) */
@@ -33,7 +47,7 @@ export interface Store<S> {
   Note: setting the value to undefined removes the key from the record. */
   key<K extends keyof S>(k: K): Store<S[K] | undefined>
 
-  /** Make a new store by going via a lens */
+  /** Make a new store via a lens */
   via<T>(lens: Lens<S, T>): Store<T>
 
   /** Make a substore with respect to some base store */
@@ -57,7 +71,24 @@ export interface ReactiveLensesAPI {
   /** Lens to a subarray */
   subarray<A>(bounds: (length: number) => Bounds): Lens<A[], A[]>
 
-  /** Lens to the first N elements */
+  /** Lens to the first N elements
+
+  violates lens laws if you set anything but N elements:
+
+  x.via(first(1)).set([2,3]).get() = [2] /= [2,3]
+
+     x.via(first(1)).set([2,3]).set([5,4]).get() = [5,4,3,...]
+             /= x.via(first(1)).set([5,4]).get() = [5,4,...]
+
+  (not idempotent)
+
+  could pad with undefined and drop excess: lens again
+
+  cannot tell if I'm a fixed-length array or dynamically sized array
+
+  should probably just stop having references to array elements (they're essentially clunky eithers)
+
+  */
   first<A>(N: number): Lens<A[], A[]>,
 
   /** Lens to the last N elements */
@@ -78,7 +109,11 @@ export interface ReactiveLensesAPI {
   /** Lens which refer to a default value instead of undefined */
   def<A>(missing: A): Lens<A | undefined, A>
 
-  /** Lens to a particular index in an array */
+  /** Lens to a particular index in an array
+
+  Setting to undefined violates lens laws if it means remove it:
+  must mean just put this value to undefined
+  */
   index<A>(position: number): Lens<A[], A | undefined>
 
   /** Make a lens from a getter and setter */
@@ -241,6 +276,13 @@ function record<R>(stores: {[P in keyof R]: Store<R[P]>}): Store<R> {
   throw "Empty record"
 }
 
+function via<S,T,U>(lens1: Lens<S, T>, lens2: Lens<T, U>): Lens<S, U> {
+  return lens(
+    (s: S) => lens2.get(lens1.get(s)),
+    (s: S, u: U) => lens1.set(s, lens2.set(lens1.get(s), u))
+  )
+}
+
 function index<A>(position: number): Lens<A[], A | undefined> {
   return lens(
     xs => xs[position],
@@ -273,6 +315,17 @@ function index<A>(position: number): Lens<A[], A | undefined> {
     return ys
   }
 }
+
+/*
+function index<A>(position: number): Lens<A[], A | undefined> {
+  return via(
+    subarray((n: number) => bounds(0, position, n)),
+    iso(
+      xs => xs.length > 0 ? xs[0] : undefined,
+      x => x === undefined ? [] : [x]
+    ))
+}
+*/
 
 function each<A>(store: Store<A[]>): Store<A | undefined>[] {
   return store.get().map((_, i) => store.via(index(i)))

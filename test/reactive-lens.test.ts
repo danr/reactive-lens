@@ -113,7 +113,12 @@ test('array insertion far out', assert => {
   r4.set(4)
   after('inserting 4', [0,1,2,void 0,4])
   r4.set(undefined)
+  console.log(store.get())
+  const us = store.get().slice()
+  us.splice(4,5)
+  console.log(us)
   after('removing 4', [0,1,2])
+  console.log(store.get())
   assert.end()
 })
 
