@@ -322,27 +322,26 @@ interface ListWithRemove<A> {
 
 function ListWithRemove<A>(): ListWithRemove<A> {
   const dict = {} as Record<string, A>
-  let order = [] as (string[] | null)
+  let order = [] as string[]
   let next_unique = 0
+  let dirty = false
 
   return {
     push(a) {
       const id = next_unique++ + ''
       dict[id] = a
-      if (order != null) {
-        order.push(id)
-      }
+      order.push(id)
       return () => {
         delete dict[id]
-        order = null
+        dirty = true
       }
     },
     iter(f) {
-      if (order == null) {
-        const cmp = (a: string, b: string) => parseInt(a) - parseInt(b)
-        order = Object.keys(dict).sort(cmp)
+      if (dirty) {
+        order = order.filter(id => id in dict)
+        dirty = false
       }
-      order.map(id => {
+      order.forEach(id => {
         if (id in dict) {
           f(dict[id])
         }
