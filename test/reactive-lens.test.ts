@@ -5,20 +5,6 @@ function reverse<A>(xs: A[]): A[] {
   return xs.slice().reverse()
 }
 
-/** Refer to two arrays after each other */
-function glue<A>(a: Store<A[]>, b: Store<A[]>): Store<A[]> {
-  return a.substore(
-    () => ([] as A[]).concat(a.get(), b.get()),
-    (v: A[]) => {
-      const al = a.get().length
-      a.transaction(() => {
-        a.set(v.slice(0, al))
-        b.set(v.slice(al))
-      })
-    }
-  )
-}
-
 function check_laws<S>(s: Store<S>, a: S, b: S, assert: test.Test): void {
   const now = s.get()
   assert.deepEqual(s.transaction(() => s.set(a).get()), a, 'get after set')
@@ -85,8 +71,9 @@ test('reactive-lens', assert => {
   test_laws(r_bs, [9,8], [6,9,8])
   test_laws(r_bs.via(L.index(1)), 10, 20)
 
-  L.each(glue(r_bs, store.at('c').at('d'))).map(r => r.modify(x => x + 1))
-  after('glue', {a: 10, b: [4, 883], c: {d: [4, 5], e: 20}}, 4)
+  r_bs.modify(xs => xs.map(x => x + 1))
+  store.at('c').at('d').modify(xs => xs.map(x => x + 1))
+  after('mapping', {a: 10, b: [4, 883], c: {d: [4, 5], e: 20}}, 2)
 
   const r_bsr = r_bs.via(L.iso(reverse, reverse))
   r_bsr.via(L.index(0)).set(42)
