@@ -14,6 +14,14 @@ Store laws (assuming no listeners):
 
     s.set(a).set(b).get() = s.set(b).get()
 
+Store laws with listeners:
+
+    s.transaction(() => s.set(a).get()) = a
+
+    s.transaction(() => s.set(s.get()).get()) = s.get()
+
+    s.transaction(() => s.set(a).set(b).get()) = s.set(b).get()
+
 */
 export interface Store<S> {
   /** Get the current value (which must not be mutated) */
@@ -34,7 +42,7 @@ export interface Store<S> {
 
   /** Start a new transaction: listeners are only invoked when the
   (top-level) transaction finishes, and not on set (and modify) inside the transaction. */
-  transaction(m: () => void): void
+  transaction<A>(m: () => A): A
 
   /** Make a new store by projecting at a subfield.
 
@@ -100,7 +108,7 @@ export interface ReactiveLensesAPI {
 
 class StoreClass<S> implements Store<S> {
   private constructor(
-    public readonly transaction: (m: () => void) => void,
+    private readonly transact: (m: () => void) => void,
 
     private readonly listen: (k: () => void) => () => void,
 
@@ -114,7 +122,7 @@ class StoreClass<S> implements Store<S> {
     let s = s0
     /** Transaction depth, only notify when setting at depth 0 */
     let depth = 0
-    /** Only notify on transactions that actually did set */
+    /** Only notify on transacts that actually did set */
     let pending = false
     /** Listeners */
     const listeners = ListWithRemove<() => void>()
@@ -122,11 +130,11 @@ class StoreClass<S> implements Store<S> {
     function notify(): void {
       if (depth == 0 && pending) {
         pending = false
-        // must use a transaction because listeners might set the state again
-        transaction(() => listeners.iter(k => k()))
+        // must use a transact because listeners might set the state again
+        transact(() => listeners.iter(k => k()))
       }
     }
-    function transaction(m: () => void) {
+    function transact(m: () => void): void {
       depth++
       m()
       depth--
@@ -138,7 +146,15 @@ class StoreClass<S> implements Store<S> {
         pending = true
         notify()
       }
-    return new StoreClass(transaction, k => listeners.push(k), () => s, set)
+    return new StoreClass(transact, k => listeners.push(k), () => s, set)
+  }
+
+  transaction<A>(m: () => A): A {
+    let a: A | undefined
+    this.transact(() => {
+      a = m()
+    })
+    return a as A // unsafe cast, but safe because transact will run m (exactly once)
   }
 
   set(s: S): Store<S> {
@@ -157,7 +173,7 @@ class StoreClass<S> implements Store<S> {
 
   substore<T>(get: () => T, set: (s: T) => void): Store<T> {
     return new StoreClass(
-      this.transaction,
+      this.transact,
       this.listen,
       get,
       set
