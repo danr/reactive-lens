@@ -46,7 +46,10 @@ test('reactive-lens', assert => {
 
   const r_a = store.at('a')
   const r_c_e = store.at('c').at('e')
-  const r_a_and_c_e = L.record({a: r_a, e: r_c_e})
+  const r_a_and_c_e = store.relabel({ a: r_a, e: r_c_e })
+
+  const rab = store.pick('a', 'b')
+  assert.deepEqual(rab.get(), {a: 1, b: [2, 3]})
 
   r_a.set(999)
   after('set', {a: 999, b: [2, 3], c: {d: [3, 4], e: 4}})
@@ -66,20 +69,20 @@ test('reactive-lens', assert => {
   L.each(r_bs)[1].set(882)
   after('each set', {a: 10, b: [2, 882], c: {d: [3, 4], e: 20}})
 
-  r_bs.via(L.index(0)).modify(x => x + 1)
+  r_bs.zoom(L.index(0)).modify(x => x + 1)
   after('index modify', {a: 10, b: [3, 882], c: {d: [3, 4], e: 20}})
   test_laws(r_bs, [9,8], [6,9,8])
-  test_laws(r_bs.via(L.index(1)), 10, 20)
+  test_laws(r_bs.zoom(L.index(1)), 10, 20)
 
   r_bs.modify(xs => xs.map(x => x + 1))
   store.at('c').at('d').modify(xs => xs.map(x => x + 1))
   after('mapping', {a: 10, b: [4, 883], c: {d: [4, 5], e: 20}}, 2)
 
-  const r_bsr = r_bs.via(L.iso(reverse, reverse))
-  r_bsr.via(L.index(0)).set(42)
+  const r_bsr = r_bs.zoom(L.iso(reverse, reverse))
+  r_bsr.zoom(L.index(0)).set(42)
   after('iso reverse', {a: 10, b: [4, 42], c: {d: [4, 5], e: 20}})
   test_laws(r_bsr, [9,8], [6,9,8])
-  test_laws(r_bsr.via(L.index(1)), 10, 20)
+  test_laws(r_bsr.zoom(L.index(1)), 10, 20)
 
   let a: any
   const unsubscribe = r_a.on(v => a = v)
@@ -100,18 +103,18 @@ test('reactive-lens', assert => {
 
 test('index', assert => {
   const {store, after} = init([0,1,2,10], assert)
-  store.via(L.index(3)).set(3)
+  store.zoom(L.index(3)).set(3)
   after('inserting 3', [0,1,2,3])
   assert.end()
 })
 
 test('index out of bounds', assert => {
   const {store} = init([0,1,2], assert)
-  const r4 = store.via(L.index(4))
+  const r4 = store.zoom(L.index(4))
   assert.throws(() => {
     r4.set(4)
   })
-  const rn = store.via(L.index(-1))
+  const rn = store.zoom(L.index(-1))
   assert.throws(() => {
     rn.set(4)
   })
@@ -120,9 +123,9 @@ test('index out of bounds', assert => {
 
 test('key', assert => {
   const {store, after, test_laws} = init({apa: 1, bepa: 2} as Record<string, number>, assert)
-  const apa = store.key('apa')
-  const bepa = store.key('bepa')
-  const cepa = store.key('cepa')
+  const apa = store.zoom(L.key('apa'))
+  const bepa = store.zoom(L.key('bepa'))
+  const cepa = store.zoom(L.key('cepa'))
   apa.set(3)
   after('setting apa', {apa: 3, bepa: 2})
   test_laws(apa, 9, 8)
@@ -131,14 +134,14 @@ test('key', assert => {
   test_laws(apa, 9, 8)
   test_laws(apa, undefined, 8)
   test_laws(apa, 8, undefined)
-  const b0 = bepa.via(L.def(0))
+  const b0 = bepa.zoom(L.def(0))
   b0.set(0)
-  after('removing bepa via def', {})
+  after('removing bepa zoom def', {})
   test_laws(b0, 9, 8)
   test_laws(b0, 0, 8)
   test_laws(b0, 8, 0)
-  cepa.via(L.def(0)).set(3)
-  after('inserting cepa via def', {cepa: 3})
+  cepa.zoom(L.def(0)).set(3)
+  after('inserting cepa zoom def', {cepa: 3})
   assert.is(cepa.get(), 3, 'get')
   assert.is(apa.get(), undefined, 'get missing')
   assert.end()

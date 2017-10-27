@@ -22,6 +22,7 @@ Store laws with listeners:
 
     s.transaction(() => s.set(a).set(b).get()) = s.set(b).get()
 
+A store is a partially applied, existentially quantified lens with a change listener.
 */
 export interface Store<S> {
   /** Get the current value (which must not be mutated) */
@@ -44,48 +45,52 @@ export interface Store<S> {
   (top-level) transaction finishes, and not on set (and modify) inside the transaction. */
   transaction<A>(m: () => A): A
 
-  /** Make a new store by projecting at a subfield.
+  /** Make a substore at a key
 
-  Note: use only when S is an object which always has this key. */
+  Note: the key must always be present. */
   at<K extends keyof S>(k: K): Store<S[K]>
 
-  /** Make a reference at a particular key in a record.
+  /** Make a substore by picking many keys
 
-  Note: the key may be missing from the record.
-  Note: setting the value to undefined removes the key from the record. */
-  key<K extends keyof S>(k: K): Store<S[K] | undefined>
+  Note: the keys must always be present. */
+  pick<Ks extends keyof S>(...ks: Ks[]): Store<{[K in Ks]: S[K]}>
 
-  /** Make a new store via a lens */
-  via<T>(lens: Lens<S, T>): Store<T>
+  /** Make a substore by relabelling */
+  relabel<T>(lenses: {[K in keyof T]: Store<T[K]>}): Store<T>
 
-  /** Make a substore with respect to some base store */
-  substore<T>(get: () => T, set: (s: T) => void): Store<T>
+  /** Zoom in on a subpart of the store via a lens */
+  zoom<T>(lens: Lens<S, T>): Store<T>
 }
 
 /** reactive-lens API */
-export interface ReactiveLensesAPI {
+export interface ReactiveLens {
   /** Make the root store */
   init<S>(s0: S): Store<S>
 
-  /** Make a new store from a record of stores */
-  record<R>(stores: {[P in keyof R]: Store<R[P]>}): Store<R>
+  /** Lens to a key in a record
 
-  /** Get partial stores for each position currently in the array */
-  each<A>(store: Store<A[]>): Store<A>[]
+  Note: the key must always be present. */
+  at<S, K extends keyof S>(k: K): Lens<S, S[K]>
 
-  /** Set using an array method (purity is ensured because the spine is copied before running the function) */
-  arr<A, K extends keyof A[]>(store: Store<A[]>, k: K): A[][K]
+  /** Lens to a keys in a record
+
+  Note: the keys must always be present. */
+  pick<S, Ks extends keyof S>(...ks: Ks[]): Lens<S, {[K in Ks]: S[K]}>
+
+  /** Lens from a record of lenses */
+  relabel<S, T>(lenses: {[K in keyof T]: Lens<S, T[K]>}): Lens<S, T>
+
+  /** Lens to a key in a record which may be missing
+
+  Note: setting the value to undefined removes the key from the record. */
+  key<S, K extends keyof S>(k: K): Lens<S, S[K] | undefined>
 
   /** Lens which refer to a default value instead of undefined */
   def<A>(missing: A): Lens<A | undefined, A>
 
-  /** Partial lens to a particular index in an array
+  /** Make a lens from a getter and setter
 
-  Note: an exception is thrown if you look outside the array.
-  */
-  index<A>(position: number): Lens<A[], A>
-
-  /** Make a lens from a getter and setter */
+  Note: lenses are subject to three lens laws */
   lens<S, T>(get: (s: S) => T, set: (s: S, t: T) => S): Lens<S, T>
 
   /** Make a lens from an isomorphism
@@ -93,17 +98,21 @@ export interface ReactiveLensesAPI {
   Note: requires that for all s and t we have f(g(t)) = t and g(f(s)) = s */
   iso<S, T>(f: (s: S) => T, g: (t: T) => S): Lens<S, T>
 
-  /** Lens to a subfield which must be present. */
-  at<S, K extends keyof S>(k: K): Lens<S, S[K]>
+  /** Compose two lenses sequentially */
+  seq<S, T, U>(lens1: Lens<S, T>, lens2: Lens<T, U>): Lens<S, U>
 
-  /** Lens to a particular key in a record.
+  /** Set using an array method (purity is ensured because the spine is copied before running the function) */
+  arr<A, K extends keyof A[]>(store: Store<A[]>, k: K): A[][K]
 
-  Note: the key may be missing from the record.
-  Note: setting the value to undefined removes the key from the record. */
-  key<S, K extends keyof S>(k: K): Lens<S, S[K] | undefined>
+  /** Partial lens to a particular index in an array
 
-  /** Compose two lenses */
-  via<S,T,U>(lens1: Lens<S, T>, lens2: Lens<T, U>): Lens<S, U>
+  Note: an exception is thrown if you look outside the array. */
+  index<A>(position: number): Lens<A[], A>
+
+  /** Get partial stores for each position currently in the array
+
+  Note: exceptions are thrown when looking outside the array. */
+  each<A>(store: Store<A[]>): Store<A>[]
 }
 
 class StoreClass<S> implements Store<S> {
@@ -171,27 +180,41 @@ class StoreClass<S> implements Store<S> {
     return this.listen(() => k(this.get()))
   }
 
-  substore<T>(get: () => T, set: (s: T) => void): Store<T> {
+  zoom<T>(lens: Lens<S, T>) {
     return new StoreClass(
       this.transact,
       this.listen,
-      get,
-      set
-    )
-  }
-
-  via<T>(lens: Lens<S, T>) {
-    return this.substore(
       () => lens.get(this.get()),
       (t: T) => this.set(lens.set(this.get(), t)))
   }
 
   at<K extends keyof S>(k: K): Store<S[K]> {
-    return this.via(at(k))
+    return this.zoom(at(k))
   }
 
-  key<K extends keyof S>(k: K): Store<S[K] | undefined> {
-    return this.via(key(k))
+  pick<Ks extends keyof S>(...ks: Ks[]): Store<{[K in Ks]: S[K]}> {
+    return this.zoom(pick(...ks))
+  }
+
+  relabel<T>(lenses: {[K in keyof T]: Store<T[K]>}): Store<T> {
+    const keys = Object.keys(lenses) as (keyof T)[]
+    return new StoreClass(
+      this.transact,
+      this.listen,
+      () => {
+        const ret = {} as T
+        keys.forEach(k => {
+          ret[k] = lenses[k].get()
+        })
+        return ret
+      },
+      (t: T) => {
+        this.transact(() => {
+          keys.forEach(k => {
+            lenses[k].set(t[k])
+          })
+        })
+      })
   }
 }
 
@@ -240,30 +263,32 @@ function def<A>(missing: A): Lens<A | undefined, A> {
     a => a === missing ? undefined : a)
 }
 
-function record<R>(stores: {[P in keyof R]: Store<R[P]>}): Store<R> {
-  for (const base_key in stores) {
-    const store = stores[base_key]
-    return store.substore(
-      () => {
-        const ret = {} as R
-        for (let k in stores) {
-          ret[k] = stores[k].get()
-        }
-        return ret
-      },
-      (v: R) => {
-        store.transaction(() => {
-          for (let k in stores) {
-            stores[k].set(v[k])
-          }
-        })
-      }
-    )
-  }
-  throw 'Empty record'
+function pick<S, Ks extends keyof S>(...keys: Ks[]): Lens<S, {[K in Ks]: S[K]}> {
+  const lenses = {} as {[K in Ks]: Lens<S, S[K]>}
+  keys.forEach((k: Ks) => lenses[k] = at(k))
+  return relabel(lenses)
 }
 
-function via<S,T,U>(lens1: Lens<S, T>, lens2: Lens<T, U>): Lens<S, U> {
+function relabel<S, T>(lenses: {[K in keyof T]: Lens<S, T[K]>}): Lens<S, T> {
+  const keys = Object.keys(lenses) as (keyof T)[]
+  return lens(
+    s => {
+      const ret = {} as T
+      keys.forEach(k => {
+        ret[k] = lenses[k].get(s)
+      })
+      return ret
+    },
+    (s, t) => {
+      let r = s
+      keys.forEach(k => {
+        r = lenses[k].set(s, t[k])
+      })
+      return r
+    })
+}
+
+function seq<S, T, U>(lens1: Lens<S, T>, lens2: Lens<T, U>): Lens<S, U> {
   return lens(
     (s: S) => lens2.get(lens1.get(s)),
     (s: S, u: U) => lens1.set(s, lens2.set(lens1.get(s), u))
@@ -287,7 +312,7 @@ function index<A>(i: number): Lens<A[], A> {
 }
 
 function each<A>(store: Store<A[]>): Store<A>[] {
-  return store.get().map((_, i) => store.via(index(i)))
+  return store.get().map((_, i) => store.zoom(index(i)))
 }
 
 function arr<A, K extends keyof Array<A>>(store: Store<Array<A>>, k: K): Array<A>[K] {
@@ -299,14 +324,15 @@ function arr<A, K extends keyof Array<A>>(store: Store<Array<A>>, k: K): Array<A
   }
 }
 
-export const Store: ReactiveLensesAPI = {
+export const Store: ReactiveLens = {
   init: StoreClass.init,
   def,
-  record,
+  relabel,
+  pick,
   index,
   each,
   arr,
-  via,
+  seq,
   lens,
   iso,
   at,
@@ -349,3 +375,4 @@ function ListWithRemove<A>(): ListWithRemove<A> {
     }
   }
 }
+

@@ -2,6 +2,8 @@
 
 `reactive-lens`: a tiny library for pure, reactive and composable state.
 
+The `Store` in this library is a _reactive lens_: a partially applied, existentially quantified lens with a change listener.
+
 ## The gist
 
 ```javascript
