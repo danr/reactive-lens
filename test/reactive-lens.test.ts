@@ -178,3 +178,44 @@ test('along along', assert => {
   assert.end()
 })
 
+test('relabel', assert => {
+  const s0 = {k: 1, g: 2}
+  const {store, after, test_laws} = init(s0, assert)
+  const ab = store.zoom(L.relabel({a: L.at<typeof s0, 'g'>('g'), b: L.at<typeof s0, 'k'>('k')}))
+  ab.set({a: 4, b: 3})
+  after('relabel', {k: 3, g: 4})
+  test_laws(ab, {a: 9, b: 8}, {a: 6, b: 5})
+  assert.end()
+})
+
+test('pick', assert => {
+  const s0 = {k: 1, g: 2, h: 3}
+  const {store, after, test_laws} = init(s0, assert)
+  const kg = store.pick('k', 'g')
+  kg.set({k: 4, g: 5})
+  after('pick', {k: 4, g: 5, h: 3})
+  test_laws(kg, {k: 9, g: 8}, {k: 6, g: 5})
+  const gh = store.zoom(L.pick('g', 'h'))
+  gh.set({g: 6, h: 7})
+  after('pick', {k: 4, g: 6, h: 7})
+  test_laws(gh, {g: 8, h: 9}, {g: 5, h: 6})
+  assert.end()
+})
+
+test('seq', assert => {
+  const {store, after, test_laws} = init(1, assert)
+  const double = L.iso((x: number) => x * 2, x => x / 2)
+  const bump = L.iso((x: number) => x + 1, x => x - 1)
+  const db = store.zoom(L.seq(double, bump))
+  assert.equals(db.get(), 3)
+  db.modify(x => x + 2)
+  assert.equals(db.get(), 5)
+  after('db modify', 2)
+  test_laws(db, 8, 9)
+  const bd = store.zoom(L.seq(bump, double))
+  assert.equals(bd.get(), 6)
+  bd.modify(x => x + 2)
+  after('bd modify', 3)
+  assert.end()
+})
+

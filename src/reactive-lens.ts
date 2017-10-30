@@ -55,7 +55,9 @@ export interface Store<S> {
   Note: the keys must always be present. */
   pick<Ks extends keyof S>(...ks: Ks[]): Store<{[K in Ks]: S[K]}>
 
-  /** Make a substore by relabelling */
+  /** Make a substore by relabelling
+
+  Note: must not use the same part of the store several times. */
   relabel<T>(lenses: {[K in keyof T]: Store<T[K]>}): Store<T>
 
   /** Zoom in on a subpart of the store via a lens */
@@ -80,7 +82,9 @@ export interface ReactiveLens {
   Note: the keys must always be present. */
   pick<S, Ks extends keyof S>(...ks: Ks[]): Lens<S, {[K in Ks]: S[K]}>
 
-  /** Lens from a record of lenses */
+  /** Lens from a record of lenses
+
+  Note: must not use the same part of the store several times. */
   relabel<S, T>(lenses: {[K in keyof T]: Lens<S, T[K]>}): Lens<S, T>
 
   /** Lens to a key in a record which may be missing
@@ -224,10 +228,7 @@ class StoreClass<S> implements Store<S> {
   }
 
   along<K extends keyof S, Ks extends keyof S, B>(k: K, i: Lens<S[K], B>, ...keep: Ks[]): Store<{[k in K]: B} & {[k in Ks]: S[k]}> {
-    return this.zoom(lens(
-      (s: S) => ({...(s as any), [k as string]: i.get(s[k])}),
-      (s: S, t: {[k in K]: B} & {[k in Ks]: S[k]}) => ({...(t as any), [k as string]: i.set(s[k], (t as any)[k])})
-    ))
+    return this.zoom(along(this)(k, i, ...keep))
   }
 }
 
@@ -306,7 +307,7 @@ function relabel<S, T>(lenses: {[K in keyof T]: Lens<S, T[K]>}): Lens<S, T> {
     (s, t) => {
       let r = s
       keys.forEach(k => {
-        r = lenses[k].set(s, t[k])
+        r = lenses[k].set(r, t[k])
       })
       return r
     })
