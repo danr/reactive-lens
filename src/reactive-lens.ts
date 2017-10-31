@@ -186,11 +186,13 @@ export class Store<S> {
   }
 
   /** Partial substore makers */
-  static readonly partial = {
+  static readonly partial: {
     /** Get partial stores for each position currently in the array
 
     Note: exceptions are thrown when looking outside the array. */
-    each<A>(store: Store<A[]>): Store<A>[] {
+    each<A>(store: Store<A[]>): Store<A>[]
+  } = {
+    each(store) {
       return store.get().map((_, i) => store.zoom(Lens.partial.index(i)))
     }
   }

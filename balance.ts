@@ -9,21 +9,22 @@ interface Block { kind: '{', header: string, value: Groups }
 
 type Group = Comment | Block | { kind: 'string', value: string }
 
-const buf = fs.readFileSync('reactive-lens.d.ts')
-const s = buf.toString()
-const n = s.length
+const show = (s: any) => JSON.stringify(s, undefined, 2)
+
 const g = (s: string) => '(?:' + s + ')'
-const b = (s: string) => '\b' + s + '\b'
 const or = (rs: string[]) => g(rs.map(g).join('|'))
 const QE = (s: string) => s.replace(/\W/g, x => '\\' + x)
 const not = (s: string) => g('(?!' + s + ')')
 const plus = (s: string) => g(s + '+')
-const semipend = ["module", "class", "interface"]
+const semipend = ["module", "class", "interface", "readonly"]
 const balancing = ["/**", "*/", "{", "}", ";"]
 const bs = or(balancing.map(QE))
 const r = new RegExp(or([bs, plus(g(not(bs) + '(.|\\s)'))]), 'mg')
+
+const buf = fs.readFileSync('reactive-lens.d.ts')
+const s = buf.toString()
 const m = s.match(r)
-const show = (s: any) => JSON.stringify(s, undefined, 2)
+
 //console.log(r)
 if (m == null) {
   console.log('no match!')
@@ -45,10 +46,9 @@ function hashes(d: number): string {
 function documentation(gs0: Groups, d: number): string {
   const gs = gs0.slice()
   const out = [] as string[]
-  const nice = (s: string) => s.replace(/(export|declare)/g, '').replace(/\s+/g, ' ').trim()
+  const nice = (s: string) => s.replace(/(export|declare|readonly|:\s*$)/g, '').replace(/\s+/g, ' ').trim()
   const text = (s: string) => s.replace(/^[ ]*/mg, '').trim()
-  const quot = (s: string) => '> ' + s.split('\n').join('\n> ')
-  const header = (s: string) => hashes(d) + ' `' + nice(s) + '`'
+  const header = (s: string) => hashes(d) + ' ' + nice(s).replace('<', '\\<')
   while (gs.length > 0) {
     const g0 = gs[0]
     const g1 = gs[1]
@@ -72,8 +72,7 @@ function documentation(gs0: Groups, d: number): string {
       }
       if (g0.kind == '/**' && g1.kind == 'string') {
         out.push('```typescript\n' + nice(g1.value) + '\n```')
-        out.push(...g0.value.map(g => quot(text(flattenGroup(g)))))
-        //out.push(documentation(g1.value, d+1))
+        out.push(...g0.value.map(g => text(flattenGroup(g))))
         gs.shift()
         gs.shift()
         continue;
@@ -97,21 +96,6 @@ function check(s: string[], t: string) {
   }
 }
 
-function slurp(gs: Group[]): string {
-  let out = ''
-  while (gs.length > 0) {
-    const g = gs[0] as Group
-    //console.log('slurp', g.kind, g.value, out, gs.length)
-    if (g.kind == 'string' && g.value == ';') {
-      return out
-    } else {
-      out += flattenGroup(g)
-      gs.shift()
-    }
-  }
-  return out
-}
-
 function flatten(gs: Group[]): Group[] {
   const out = [] as Group[]
   while (gs.length > 0) {
@@ -132,37 +116,9 @@ function flatten(gs: Group[]): Group[] {
     out.push(gs.shift() as Group)
   }
   return out
-
-  /*
-
-  const out = [] as Group[]
-  let i = 0
-  while (gs.length > 0) {
-    const g = gs[0] as Group
-    if (gs.length > 1) {
-      const gn = gs[1] as Group
-      if (gn.kind == '{' && g.kind == 'string') {
-        if (g.kind == 'string' && ) {
-          while (gs.length > 1 && (gs[0].kind != 'string' || gs[0].value == ';')) {
-            console.log('flattening', show(gs))
-            console.log('flattening', show(g.value), show(gn.value), show(gs[2]))
-            gs.shift()
-            gs.shift()
-            gs.unshift({kind: 'string', value: g.value + flattenGroup(gn)})
-            console.log('after', show(gs[0]), show(gs[1]))
-          }
-          continue;
-        }
-      }
-    }
-    out.push(gs.shift() as Group)
-  }
-  return out
-  */
 }
 
 function flattenGroup(g: Group): string {
-  //console.log('flatten', g)
   switch (g.kind) {
     case '/**':
       return '/**' + g.value.map(flattenGroup).join('') + '*/'
@@ -178,12 +134,9 @@ function flattenGroup(g: Group): string {
 function parse(s: string[]): Groups {
   const groups = [] as Group[]
   while (s.length > 0 && s[0] != '*/' && s[0] != '}') {
-    //console.log('calling', s)
     groups.push(parseGroup(s.shift() as string, s))
   }
-  //console.log('groups:', groups)
   const fgroups = flatten(groups)
-  //console.log('fgroups:', fgroups)
   return fgroups
 }
 
