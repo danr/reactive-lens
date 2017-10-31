@@ -1,4 +1,4 @@
-import { Store, Store as L } from './../src/reactive-lens'
+import { Store, Lens as L } from './../src/reactive-lens'
 import * as test from "tape"
 
 function reverse<A>(xs: A[]): A[] {
@@ -66,23 +66,23 @@ test('reactive-lens', assert => {
   test_laws(r_a_and_c_e, {a:1, e:2}, {a:2, e:1})
 
   const r_bs = store.at('b')
-  L.each(r_bs)[1].set(882)
+  Store.partial.each(r_bs)[1].set(882)
   after('each set', {a: 10, b: [2, 882], c: {d: [3, 4], e: 20}})
 
-  r_bs.zoom(L.index(0)).modify(x => x + 1)
+  r_bs.zoom(L.partial.index(0)).modify(x => x + 1)
   after('index modify', {a: 10, b: [3, 882], c: {d: [3, 4], e: 20}})
   test_laws(r_bs, [9,8], [6,9,8])
-  test_laws(r_bs.zoom(L.index(1)), 10, 20)
+  test_laws(r_bs.zoom(L.partial.index(1)), 10, 20)
 
   r_bs.modify(xs => xs.map(x => x + 1))
   store.at('c').at('d').modify(xs => xs.map(x => x + 1))
   after('mapping', {a: 10, b: [4, 883], c: {d: [4, 5], e: 20}}, 2)
 
   const r_bsr = r_bs.zoom(L.iso(reverse, reverse))
-  r_bsr.zoom(L.index(0)).set(42)
+  r_bsr.zoom(L.partial.index(0)).set(42)
   after('iso reverse', {a: 10, b: [4, 42], c: {d: [4, 5], e: 20}})
   test_laws(r_bsr, [9,8], [6,9,8])
-  test_laws(r_bsr.zoom(L.index(1)), 10, 20)
+  test_laws(r_bsr.zoom(L.partial.index(1)), 10, 20)
 
   let a: any
   const unsubscribe = r_a.on(v => a = v)
@@ -103,18 +103,18 @@ test('reactive-lens', assert => {
 
 test('index', assert => {
   const {store, after} = init([0,1,2,10], assert)
-  store.zoom(L.index(3)).set(3)
+  store.zoom(L.partial.index(3)).set(3)
   after('inserting 3', [0,1,2,3])
   assert.end()
 })
 
 test('index out of bounds', assert => {
   const {store} = init([0,1,2], assert)
-  const r4 = store.zoom(L.index(4))
+  const r4 = store.zoom(L.partial.index(4))
   assert.throws(() => {
     r4.set(4)
   })
-  const rn = store.zoom(L.index(-1))
+  const rn = store.zoom(L.partial.index(-1))
   assert.throws(() => {
     rn.set(4)
   })
