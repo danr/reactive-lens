@@ -7,65 +7,67 @@ export interface Lens<S, T> {
   set(s: S, t: T): S
 }
 
-function lens<S, T>(get: (s: S) => T, set: (s: S, t: T) => S): Lens<S, T> {
-  return {get, set}
-}
-
-function relabel<S, T>(lenses: {[K in keyof T]: Lens<S, T[K]>}): Lens<S, T> {
-  const keys = Object.keys(lenses) as (keyof T)[]
-  return lens(
-    s => {
-      const ret = {} as T
-      keys.forEach(k => {
-        ret[k] = lenses[k].get(s)
-      })
-      return ret
-    },
-    (s, t) => {
-      let r = s
-      keys.forEach(k => {
-        r = lenses[k].set(r, t[k])
-      })
-      return r
-    })
-}
-
-function at<S, K extends keyof S>(k: K): Lens<S, S[K]> {
-  return lens(
-    s => s[k],
-    (s, v) => ({...(s as any), [k as string]: v}))
-              // unsafe cast // safe cast
-}
-
-function iso<S, T>(f: (s: S) => T, g: (t: T) => S): Lens<S, T> {
-  return lens(f, (_s: S, t: T) => g(t))
-}
-
 /** Utility functions on lenses */
-export const Lens = {
-  /** Lens to a key in a record
+export module Lens {
+  /** Make a lens from a getter and setter
 
-  Note: the key must always be present. */
-  at,
-
-  /** Lens to a keys in a record
-
-  Note: the keys must always be present. */
-  pick<S, Ks extends keyof S>(...keys: Ks[]): Lens<S, {[K in Ks]: S[K]}> {
-    const lenses = {} as {[K in Ks]: Lens<S, S[K]>}
-    keys.forEach((k: Ks) => lenses[k] = at(k))
-    return relabel(lenses)
-  },
+  Note: lenses are subject to three lens laws */
+  export function lens<S, T>(get: (s: S) => T, set: (s: S, t: T) => S): Lens<S, T> {
+    return {get, set}
+  }
 
   /** Lens from a record of lenses
 
   Note: must not use the same part of the store several times. */
-  relabel,
+  export function relabel<S, T>(lenses: {[K in keyof T]: Lens<S, T[K]>}): Lens<S, T> {
+    const keys = Object.keys(lenses) as (keyof T)[]
+    return lens(
+      s => {
+        const ret = {} as T
+        keys.forEach(k => {
+          ret[k] = lenses[k].get(s)
+        })
+        return ret
+      },
+      (s, t) => {
+        let r = s
+        keys.forEach(k => {
+          r = lenses[k].set(r, t[k])
+        })
+        return r
+      })
+  }
+
+  /** Lens to a key in a record
+
+  Note: the key must always be present. */
+  export function at<S, K extends keyof S>(k: K): Lens<S, S[K]> {
+    return lens(
+      s => s[k],
+      (s, v) => ({...(s as any), [k as string]: v}))
+                // unsafe cast // safe cast
+  }
+
+  /** Make an isomorphism. Every isomorphism is a lens.
+
+  Note: requires that for all s and t we have f(g(t)) = t and g(f(s)) = s */
+  export function iso<S, T>(f: (s: S) => T, g: (t: T) => S): Lens<S, T> {
+    return lens(f, (_s: S, t: T) => g(t))
+  }
+
+  /** Lens to a keys in a record
+
+  Note: the keys must always be present. */
+  export function pick<S, Ks extends keyof S>(...keys: Ks[]): Lens<S, {[K in Ks]: S[K]}> {
+    const lenses = {} as {[K in Ks]: Lens<S, S[K]>}
+    keys.forEach((k: Ks) => lenses[k] = at(k))
+    return relabel(lenses)
+  }
 
   /** Lens to a key in a record which may be missing
 
   Note: setting the value to undefined removes the key from the record. */
-  key<S, K extends keyof S>(k: K): Lens<S, S[K] | undefined> {
+  export function key<S, K extends keyof S>(k: K): Lens<S, S[K] | undefined> {
     return lens(
       x => x[k],
       (s, v) => {
@@ -87,45 +89,35 @@ export const Lens = {
         }
       }
     )
-  },
+  }
 
   /** Lens which refer to a default value instead of undefined */
-  def<A>(missing: A): Lens<A | undefined, A> {
+  export function def<A>(missing: A): Lens<A | undefined, A> {
   return iso(
     a => a === undefined ? missing : a,
     a => a === missing ? undefined : a)
-  },
-
-  /** Make a lens from a getter and setter
-
-  Note: lenses are subject to three lens laws */
-  lens,
-
-  /** Make an isomorphism. Every isomorphism is a lens.
-
-  Note: requires that for all s and t we have f(g(t)) = t and g(f(s)) = s */
-  iso,
+  }
 
   /** Compose two lenses sequentially */
-  seq<S, T, U>(lens1: Lens<S, T>, lens2: Lens<T, U>): Lens<S, U> {
+  export function seq<S, T, U>(lens1: Lens<S, T>, lens2: Lens<T, U>): Lens<S, U> {
     return lens(
       (s: S) => lens2.get(lens1.get(s)),
       (s: S, u: U) => lens1.set(s, lens2.set(lens1.get(s), u))
     )
-  },
+  }
 
   /** Set using an array method (purity is ensured because the spine is copied before running the function) */
-  arr<A, K extends keyof Array<A>>(store: Store<Array<A>>, k: K): Array<A>[K] {
+  export function arr<A, K extends keyof Array<A>>(store: Store<Array<A>>, k: K): Array<A>[K] {
     return (...args: any[]) => {
       const xs = store.get().slice()
       const ret = (xs[k] as any)(...args)
       store.set(xs)
       return ret
     }
-  },
+  }
 
   /** Apply a lens along one field, keep the rest of the shape intact */
-  along<S>(type_hint?: Store<S> | (() => S)): <K extends keyof S, Ks extends keyof S, B>(k: K, i: Lens<S[K], B>, ...keep: Ks[]) => Lens<S, {[k in K]: B} & {[k in Ks]: S[k]}> {
+  export function along<S>(type_hint?: Store<S> | (() => S)): <K extends keyof S, Ks extends keyof S, B>(k: K, i: Lens<S[K], B>, ...keep: Ks[]) => Lens<S, {[k in K]: B} & {[k in Ks]: S[k]}> {
     function ret<K extends keyof S, Ks extends keyof S, B>(k: K, i: Lens<S[K], B>, ...keep: Ks[]): Lens<S, {[k in K]: B} & {[k in Ks]: S[k]}> {
       return lens(
         (s: S) => ({...(s as any), [k as any]: i.get(s[k])}),
@@ -134,15 +126,14 @@ export const Lens = {
       )
     }
     return ret
-  },
+  }
 
   /** Partial lenses */
-  partial: {
-
+  export module partial {
     /** Partial lens to a particular index in an array
 
     Note: an exception is thrown if you look outside the array. */
-    index<A>(i: number): Lens<A[], A> {
+    export function index<A>(i: number): Lens<A[], A> {
       const within = (xs: A[]) => {
         if (i < 0 || i >= xs.length) {
           throw 'Out of bounds'
@@ -183,12 +174,8 @@ A store is a partially applied, existentially quantified lens with a change list
 export class Store<S> {
   private constructor(
     private readonly transact: (m: () => void) => void,
-
     private readonly listen: (k: () => void) => () => void,
-
-    /** Get the current value (which must not be mutated) */
-    public readonly get: () => S,
-
+    private readonly _get: () => S,
     private readonly _set: (s: S) => void)
   { }
 
@@ -224,16 +211,17 @@ export class Store<S> {
       }
     return new Store(transact, k => listeners.push(k), () => s, set)
 
+    /** List with iteration and O(1) push and remove */
     function ListWithRemove<A>() {
       const dict = {} as Record<string, A>
-      let order = [] as string[]
+      let order = [] as number[]
       let next_unique = 0
       let dirty = false
 
       return {
         /** Push a new element, returns the delete function */
         push(a: A): () => void {
-          const id = next_unique++ + ''
+          const id = next_unique++
           dict[id] = a
           order.push(id)
           return () => {
@@ -265,6 +253,11 @@ export class Store<S> {
       a = m()
     })
     return a as A // unsafe cast, but safe because transact will run m (exactly once)
+  }
+
+  /** Get the current value (which must not be mutated) */
+  get(): S {
+    return this._get()
   }
 
   /** Set the value
@@ -301,7 +294,7 @@ export class Store<S> {
 
   Note: the key must always be present. */
   at<K extends keyof S>(k: K): Store<S[K]> {
-    return this.zoom(at(k))
+    return this.zoom(Lens.at(k))
   }
 
   /** Make a substore by picking many keys
@@ -351,20 +344,24 @@ export class Store<S> {
   }
 }
 
-// history zipper
+/** History zipper */
 export interface History<S> {
   readonly tip: Stack<S>,
   readonly next: null | Stack<S>,
 }
 
+/** A non-empty stack */
 export interface Stack<S> {
   readonly top: S
   readonly pop: null | Stack<S>
 }
 
-export const History = {
+/** History zipper functions
 
-  undo<S>(h: History<S>): History<S> {
+Todo: document this without puns and semi-obscure references */
+export module History {
+  /** Undo iff there is a past */
+  export function undo<S>(h: History<S>): History<S> {
     if (h.tip.pop != null) {
       return {
         tip: h.tip.pop,
@@ -373,9 +370,10 @@ export const History = {
     } else {
       return h
     }
-  },
+  }
 
-  redo<S>(h: History<S>): History<S> {
+  /** Redo iff there is a future */
+  export function redo<S>(h: History<S>): History<S> {
     if (h.next != null) {
       return {
         tip: {top: h.next.top, pop: h.tip},
@@ -384,28 +382,30 @@ export const History = {
     } else {
       return h
     }
-  },
+  }
 
-  advance<S>(h: History<S>): History<S> {
+  /** Advances the history by copying the present */
+  export function advance<S>(h: History<S>): History<S> {
     return {
       tip: {top: h.tip.top, pop: h.tip},
       next: null
     }
-  },
+  }
 
-  init_undoable<S>(now: S): History<S> {
+  /** Make history */
+  export function init<S>(now: S): History<S> {
     return {
       tip: {top: now, pop: null},
       next: null
     }
-  },
+  }
 
-  now<S>(): Lens<History<S>, S> {
-    return lens(
+  /** Lens to the present moment */
+  export function now<S>(): Lens<History<S>, S> {
+    return Lens.lens(
       h => h.tip.top,
       (h, v) => ({tip: {top: v, pop: h.tip.pop}, next: h.next})
     )
-  },
-
+  }
 }
 
