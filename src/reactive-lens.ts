@@ -243,12 +243,12 @@ function iso<S, T>(f: (s: S) => T, g: (t: T) => S): Lens<S, T> {
   return lens(f, (_s: S, t: T) => g(t))
 }
 
-function along<S>(type_hint?: Store<S> | (() => S)): <K extends keyof S, Ks extends keyof S, A, B>(k: K, i: Lens<A, B>, ...keep: Ks[]) => Lens<S, {[k in K]: B} & {[k in Ks]: S[k]}> {
-  function ret<K extends keyof S, Ks extends keyof S, A, B>(k: K, i: Lens<A, B>, ...keep: Ks[]): Lens<S, {[k in K]: B} & {[k in Ks]: S[k]}> {
+function along<S>(type_hint?: Store<S> | (() => S)): <K extends keyof S, Ks extends keyof S, B>(k: K, i: Lens<S[K], B>, ...keep: Ks[]) => Lens<S, {[k in K]: B} & {[k in Ks]: S[k]}> {
+  function ret<K extends keyof S, Ks extends keyof S, B>(k: K, i: Lens<S[K], B>, ...keep: Ks[]): Lens<S, {[k in K]: B} & {[k in Ks]: S[k]}> {
     return lens(
-      (s: {[K in Ks]: S[K]} & {[k in K]: A}) => ({...(s as any), [k as string]: i.get((s as any)[k])}),
-      (s: {[K in Ks]: S[K]} & {[k in K]: A},
-       t: {[K in Ks]: S[K]} & {[k in K]: B}) => ({...(t as any), [k as string]: i.set((s as any)[k], (t as any)[k])})
+      (s: S) => ({...(s as any), [k as any]: i.get(s[k])}),
+      (s: S,
+       t: {[K in Ks]: S[K]} & {[k in K]: B}) => ({...(t as any), [k as any]: i.set(s[k], (t as {[k in K]: B})[k])})
     )
   }
   return ret
