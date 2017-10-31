@@ -111,18 +111,21 @@ export interface ReactiveLens {
   /** Set using an array method (purity is ensured because the spine is copied before running the function) */
   arr<A, K extends keyof A[]>(store: Store<A[]>, k: K): A[][K]
 
-  /** Partial lens to a particular index in an array
-
-  Note: an exception is thrown if you look outside the array. */
-  index<A>(position: number): Lens<A[], A>
-
-  /** Get partial stores for each position currently in the array
-
-  Note: exceptions are thrown when looking outside the array. */
-  each<A>(store: Store<A[]>): Store<A>[]
-
   /** Apply a lens along one field, keep the rest of the shape intact */
-  along<S>(type_hint?: Store<S> | (() => S)): <K extends keyof S, Ks extends keyof S, A, B>(k: K, i: Lens<A, B>, ...keep: Ks[]) => Lens<S, {[k in K]: B} & {[k in Ks]: S[k]}>
+  along<S>(type_hint?: Store<S> | (() => S)): <K extends keyof S, Ks extends keyof S, B>(k: K, i: Lens<S[K], B>, ...keep: Ks[]) => Lens<S, {[k in K]: B} & {[k in Ks]: S[k]}>
+
+  /** Partial lenses */
+  partial: {
+    /** Get partial stores for each position currently in the array
+
+    Note: exceptions are thrown when looking outside the array. */
+    each<A>(store: Store<A[]>): Store<A>[]
+
+    /** Partial lens to a particular index in an array
+
+    Note: an exception is thrown if you look outside the array. */
+    index<A>(position: number): Lens<A[], A>
+  }
 }
 
 class StoreClass<S> implements Store<S> {
@@ -354,8 +357,7 @@ export const Store: ReactiveLens = {
   def,
   relabel,
   pick,
-  index,
-  each,
+  partial: {index, each},
   arr,
   seq,
   lens,
