@@ -31,14 +31,14 @@ if (m == null) {
   //console.log(m)
   const gs = parse(m)
   //console.log(JSON.stringify(gs, undefined, 2))
-  console.log(documentation(gs, 1))
+  console.log(documentation(gs, 3))
 }
 
-function header(d: number): string {
+function hashes(d: number): string {
   if (d == 0) {
     return ''
   } else {
-    return '#' + header(d-1)
+    return '#' + hashes(d-1)
   }
 }
 
@@ -47,7 +47,8 @@ function documentation(gs0: Groups, d: number): string {
   const out = [] as string[]
   const nice = (s: string) => s.replace(/(export|declare)/g, '').replace(/\s+/g, ' ').trim()
   const text = (s: string) => s.replace(/^[ ]*/mg, '').trim()
-  const header = (s: string) => '## `' + nice(s) + '`'
+  const quot = (s: string) => '> ' + s.split('\n').join('\n> ')
+  const header = (s: string) => hashes(d) + ' `' + nice(s) + '`'
   while (gs.length > 0) {
     const g0 = gs[0]
     const g1 = gs[1]
@@ -70,8 +71,8 @@ function documentation(gs0: Groups, d: number): string {
         continue;
       }
       if (g0.kind == '/**' && g1.kind == 'string') {
-        out.push('#' + header(g1.value))
-        out.push(...g0.value.map(g => text(flattenGroup(g))))
+        out.push('```typescript\n' + nice(g1.value) + '\n```')
+        out.push(...g0.value.map(g => quot(text(flattenGroup(g)))))
         //out.push(documentation(g1.value, d+1))
         gs.shift()
         gs.shift()
