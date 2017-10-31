@@ -404,3 +404,57 @@ function ListWithRemove<A>(): ListWithRemove<A> {
   }
 }
 
+// history zipper
+export interface History<S> {
+  readonly tip: Stack<S>,
+  readonly next: null | Stack<S>,
+}
+
+export interface Stack<S> {
+  top: S
+  pop: null | Stack<S>
+}
+
+export function undo<S>(h: History<S>): History<S> {
+  if (h.tip.pop != null) {
+    return {
+      tip: h.tip.pop,
+      next: {top: h.tip.top, pop: h.next}
+    }
+  } else {
+    return h
+  }
+}
+
+export function redo<S>(h: History<S>): History<S> {
+  if (h.next != null) {
+    return {
+      tip: {top: h.next.top, pop: h.tip},
+      next: h.next.pop
+    }
+  } else {
+    return h
+  }
+}
+
+export function advance<S>(h: History<S>): History<S> {
+  return {
+    tip: {top: h.tip.top, pop: h.tip},
+    next: null
+  }
+}
+
+export function init_undoable<S>(now: S): History<S> {
+  return {
+    tip: {top: now, pop: null},
+    next: null
+  }
+}
+
+export function now<S>(): Lens<History<S>, S> {
+  return lens(
+    h => h.tip.top,
+    (h, v) => ({tip: {top: v, pop: h.tip.pop}, next: h.next})
+  )
+}
+
