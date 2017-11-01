@@ -1,38 +1,240 @@
 // utility script to balance comments and brackets and then documentation
 
 import * as fs from 'fs'
+const show = (s: any) => JSON.stringify(s, undefined, 2)
 
 type Groups = Group[]
 
-interface Comment { kind: '/**', value: Groups }
-interface Block { kind: '{', header: string, value: Groups }
+interface Block { kind: 'block', open: string, value: Groups, close: string }
+interface Literal { kind: 'string', value: string }
 
-type Group = Comment | Block | { kind: 'string', value: string }
+type Group = Block | Literal
 
-const show = (s: any) => JSON.stringify(s, undefined, 2)
+function traverse(f: (gs: Group[]) => Group[], gs: Group[]): Group[] {
+  let out = [] as Group[]
+  for (let i = gs.length - 1; i >= 0; i--) {
+    let g = gs[i]
+    if (g.kind == 'block') {
+      g = {...g, value: traverse(f, g.value)}
+    }
+    out.unshift(g)
+    out = f(out)
+  }
+  return out
+}
 
-const g = (s: string) => '(?:' + s + ')'
-const or = (rs: string[]) => g(rs.map(g).join('|'))
-const QE = (s: string) => s.replace(/\W/g, x => '\\' + x)
-const not = (s: string) => g('(?!' + s + ')')
-const plus = (s: string) => g(s + '+')
-const semipend = ["module", "class", "interface", "readonly"]
-const balancing = ["/**", "*/", "{", "}", ";"]
-const bs = or(balancing.map(QE))
-const r = new RegExp(or([bs, plus(g(not(bs) + '(.|\\s)'))]), 'mg')
+function flatten(g: Group): string {
+  switch (g.kind) {
+    case 'block':  return g.open + inner(g) + g.close
+    case 'string': return g.value
+  }
+}
 
-const buf = fs.readFileSync('reactive-lens.d.ts')
-const s = buf.toString()
-const m = s.match(r)
+function inner(g: Group): string {
+  switch (g.kind) {
+    case 'block':  return g.value.map(flatten).join('')
+    case 'string': return g.value
+  }
+}
 
-//console.log(r)
-if (m == null) {
-  console.log('no match!')
-} else {
-  //console.log(m)
-  const gs = parse(m)
-  //console.log(JSON.stringify(gs, undefined, 2))
-  console.log(documentation(gs, 3))
+function balance(s: string, pairs: [string, string][], separators: string[] = []): Group[] {
+  const g = (s: string) => '(?:' + s + ')'
+  const or = (rs: string[]) => g(rs.map(g).join('|'))
+  const QE = (s: string) => s.replace(/\W/g, x => '\\' + x)
+  const not = (s: string) => g('(?!' + s + ')')
+  const plus = (s: string) => g(s + '+')
+  const balancing = (separators).concat(...pairs)
+  const bs = or(balancing.map(QE))
+  const r = new RegExp(or([bs, plus(g(not(bs) + '(.|\\s)'))]), 'mg')
+  const m = s.match(r)
+
+  let d: string[]
+
+  if (m) {
+    d = m
+    return parse('')
+  } else {
+    throw 'No parse'
+  }
+
+  function parse(until: string): Groups {
+    const groups = [] as Group[]
+    while (d.length > 0 && d[0] != until) {
+      groups.push(parseGroup(d.shift() as string))
+    }
+    return groups
+  }
+
+  function parseGroup(open: string): Group {
+    for (const p of pairs) {
+      if (p[0] == open) {
+        const value = parse(p[1])
+        const top = d.shift()
+        if (top != p[1]) {
+          console.log(p)
+          throw 'Expected ' + p[1] + ' but got ' + top
+        }
+        return {kind: 'block', open: p[0], value, close: p[1]}
+      }
+    }
+    // const value = parse()
+    return {kind: 'string', value: open}
+  }
+}
+
+const sections = ["module", "class", "interface", "readonly"]
+
+function headers(gs: Group[]): Group[] {
+  const g0 = gs[0]
+  const g1 = gs[1]
+  const g2 = gs[2]
+  if (
+    g0 && g0.kind == 'string' &&
+    g1 && g1.kind == 'block' && g1.open == '{' &&
+    g2 && g2.kind == 'string' &&
+    sections.every(s => -1 == g0.value.search(s))
+  ) {
+    const g: Group = {kind: 'string', value: g0.value + flatten(g1) + g2.value}
+    return headers([g as Group].concat(gs.slice(3)))
+  }
+  return gs
+}
+
+interface Entry {
+  header: string,
+  docstring: string,
+  children: Entry[]
+}
+
+function mapEntries(f: (e: Entry) => Entry, es: Entry[]): Entry[] {
+  return es.map(e => f({...e, children: mapEntries(f, e.children)}))
+}
+
+function filterEntries(f: (e: Entry) => boolean, es: Entry[]): Entry[] {
+  return es.map(e => ({...e, children: filterEntries(f, e.children)})).filter(f)
+}
+
+function documentation(gs0: Groups): Entry[] {
+  const gs = gs0.slice()
+  const out = [] as Entry[]
+  while (gs.length > 0) {
+    const g0 = gs[0]
+    const g1 = gs[1]
+    const g2 = gs[2]
+    if (g0 && g1) {
+      if (
+        g2 &&
+        g0.kind == 'block' && g0.open == '/**' &&
+        g1.kind == 'string' &&
+        g2.kind == 'block' && g2.open == '{'
+      ) {
+        out.push({
+          header: g1.value,
+          docstring: inner(g0),
+          children: documentation(g2.value)
+        })
+        gs.shift()
+        gs.shift()
+        gs.shift()
+        continue;
+      }
+      if (
+        g0.kind == 'string' &&
+        g1.kind == 'block' && g1.open == '{'
+      ) {
+        out.push({
+          header: g0.value,
+          docstring: '',
+          children: documentation(g1.value)
+        })
+        gs.shift()
+        gs.shift()
+        continue;
+      }
+      if (
+        g0.kind == 'block' && g0.open == '/**' &&
+        g1.kind == 'string'
+      ) {
+        out.push({
+          header: g1.value,
+          docstring: inner(g0),
+          children: []
+        })
+        gs.shift()
+        gs.shift()
+        continue;
+      }
+    }
+    if (g0.kind == 'string' && g0.value.match(/^\s*;?\s*$/)) {
+      // ok
+    } else if (g0.kind == 'string') {
+      out.push({header: g0.value, docstring: '', children: []})
+    } else {
+      console.log('whatis: ', show([g0, g1]))
+    }
+    gs.shift()
+  }
+  return out
+}
+
+function pretty(entry: Entry): Entry {
+  const {header, docstring} = entry
+  const nice = (s: string) => s.replace(/(export|declare|readonly|:\s*$)/g, '').replace(/\s+/g, ' ').trim()
+  const text = (s: string) => s.replace(/^[ ]*/mg, '').trim()
+  const wrap = (s: string) => {
+    const breakes = [':', '=>']
+    const components = balance(s, [['(', ')'], ['{', '}'], ['[', ']']], breakes).map(flatten)
+    function group(): string[] {
+      const c = components.shift()
+      if (c === undefined) {
+        return []
+      } else if (breakes.some(b => null != c.match('^' + b + '$'))) {
+        return [c].concat(group())
+      } else {
+        const g = group().slice()
+        const h = g.shift()
+        if (h === undefined) {
+          return [c]
+        } else {
+          return [c + h].concat(g)
+        }
+      }
+    }
+    const m = group()
+    let active = [] as string[]
+    const out = [active]
+    while (m.length > 0) {
+      const s = m.shift() as string
+      if (active.join('').length + s.length > 90) {
+        active = []
+        out.push(active)
+      }
+      active.push(s)
+    }
+    return out.map(s => s.join('').trim()).join('\n  ')
+  }
+  return {
+    ...entry,
+    header: wrap(text(nice(header))),
+    docstring: text(docstring)
+  }
+}
+
+function explicitHierarchy(entry: Entry): Entry {
+  const {header, docstring, children} = entry
+  if (children.length == 0) {
+    const m = header.match(/^(?:function |)(static \w+|\w+)/)
+    return {
+      ...entry,
+      header: m == null ? header : m[1],
+      docstring: '```typescript\n' + header + '\n```\n\n' + docstring
+    }
+  } else {
+    return {
+      ...entry,
+      children: mapEntries(e => ({...e, header: header.replace(/module /, '').trim() + '.' + e.header}), children)
+    }
+  }
 }
 
 function hashes(d: number): string {
@@ -43,113 +245,24 @@ function hashes(d: number): string {
   }
 }
 
-function documentation(gs0: Groups, d: number): string {
-  const gs = gs0.slice()
-  const out = [] as string[]
-  const nice = (s: string) => s.replace(/(export|declare|readonly|:\s*$)/g, '').replace(/\s+/g, ' ').trim()
-  const text = (s: string) => s.replace(/^[ ]*/mg, '').trim()
-  const header = (s: string) => hashes(d) + ' ' + nice(s).replace('<', '\\<')
-  while (gs.length > 0) {
-    const g0 = gs[0]
-    const g1 = gs[1]
-    const g2 = gs[2]
-    if (g0 && g1) {
-      if (g2 && g0.kind == '/**' && g1.kind == 'string' && g2.kind == '{') {
-        out.push(header(g1.value))
-        out.push(...g0.value.map(g => text(flattenGroup(g))))
-        out.push(text(documentation(g2.value, d+1)))
-        gs.shift()
-        gs.shift()
-        gs.shift()
-        continue;
-      }
-      if (g0.kind == 'string' && g1.kind == '{') {
-        out.push(header(g0.value))
-        out.push(text(documentation(g1.value, d+1)))
-        gs.shift()
-        gs.shift()
-        continue;
-      }
-      if (g0.kind == '/**' && g1.kind == 'string') {
-        out.push('```typescript\n' + nice(g1.value) + '\n```')
-        out.push(...g0.value.map(g => text(flattenGroup(g))))
-        gs.shift()
-        gs.shift()
-        continue;
-      }
-    }
-    if (g0.kind == 'string' && g0.value.match(/\s*;?\s*/)) {
-      // ok
-    } else {
-      out.push(show([g0, g1]))
-    }
-    gs.shift()
-  }
-  return out.join('\n\n')
+function linearise(es: Entry[], depth: number): string {
+  return es.map(e => linearise1(e, depth)).join('\n\n') + '\n\n'
 }
 
-function check(s: string[], t: string) {
-  const top = s.shift()
-  if (top != t) {
-    console.log('Expected ', t.toString(), ' but got ', top)
-    console.log('Remaining: ', s.join(',').toString().slice(0, 20))
-  }
+function linearise1(entry: Entry, depth: number): string {
+  const {header, docstring, children} = entry
+  return hashes(depth) + ' ' + header.replace('<', '\\<') + '\n\n' + docstring + '\n\n' + linearise(children, depth)
 }
 
-function flatten(gs: Group[]): Group[] {
-  const out = [] as Group[]
-  while (gs.length > 0) {
-    const g0 = gs[0]
-    const g1 = gs[1]
-    const g2 = gs[2]
-    if (g0 && g1 && g2) {
-      if (g0.kind == 'string' && semipend.every(s => -1 == g0.value.search(s))) {
-        if (g1.kind == '{' && g2.kind == 'string') {
-          gs.shift()
-          gs.shift()
-          gs.shift()
-          gs.unshift({kind: 'string', value: g0.value + flattenGroup(g1) + g2.value})
-          continue;
-        }
-      }
-    }
-    out.push(gs.shift() as Group)
-  }
-  return out
-}
+const buf = fs.readFileSync('reactive-lens.d.ts')
+const s = buf.toString()
+const m = balance(s, [["/**", "*/"], ["{", "}"]], [';'])
 
-function flattenGroup(g: Group): string {
-  switch (g.kind) {
-    case '/**':
-      return '/**' + g.value.map(flattenGroup).join('') + '*/'
+console.log(
+  (e => linearise(e, 3))(
+  mapEntries(explicitHierarchy,
+  mapEntries(pretty,
+  filterEntries(e => e.header.search(/private/) == -1,
+  documentation(
+  traverse(headers, m)))))))
 
-    case '{':
-      return '{' + g.value.map(flattenGroup).join('') + '}'
-
-    case 'string':
-      return g.value
-  }
-}
-
-function parse(s: string[]): Groups {
-  const groups = [] as Group[]
-  while (s.length > 0 && s[0] != '*/' && s[0] != '}') {
-    groups.push(parseGroup(s.shift() as string, s))
-  }
-  const fgroups = flatten(groups)
-  return fgroups
-}
-
-function parseGroup(kind: string, s: string[]): Group {
-  if (kind == '/**') {
-    const value = parse(s)
-    check(s, '*/')
-    return {kind, value}
-  } else if (kind == '{') {
-    const value = parse(s)
-    check(s, '}')
-    return {kind: '{', header: kind, value}
-  } else {
-    return {kind: 'string', value: kind}
-  }
-}

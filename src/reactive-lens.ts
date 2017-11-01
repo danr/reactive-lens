@@ -3,23 +3,19 @@
 
 Store laws (assuming no listeners):
 
-```
-s.set(a).get() = a
-
-s.set(s.get()).get() = s.get()
-
-s.set(a).set(b).get() = s.set(b).get()
-```
+> `s.set(a).get() = a`
+>
+> `s.set(s.get()).get() = s.get()`
+>
+> `s.set(a).set(b).get() = s.set(b).get()`
 
 Store laws with listeners:
 
-```
-s.transaction(() => s.set(a).get()) = a
-
-s.transaction(() => s.set(s.get()).get()) = s.get()
-
-s.transaction(() => s.set(a).set(b).get()) = s.set(b).get()
-```
+> `s.transaction(() => s.set(a).get()) = a`
+>
+> `s.transaction(() => s.set(s.get()).get()) = s.get()`
+>
+> `s.transaction(() => s.set(a).set(b).get()) = s.set(b).get()`
 
 A store is a partially applied, existentially quantified lens with a change listener.
 */
@@ -97,16 +93,6 @@ export class Store<S> {
     }
   }
 
-  /** Start a new transaction: listeners are only invoked when the
-  (top-level) transaction finishes, and not on set (and modify) inside the transaction. */
-  transaction<A>(m: () => A): A {
-    let a: A | undefined
-    this.transact(() => {
-      a = m()
-    })
-    return a as A // unsafe cast, but safe because transact will run m (exactly once)
-  }
-
   /** Get the current value (which must not be mutated) */
   get(): S {
     return this._get()
@@ -131,6 +117,16 @@ export class Store<S> {
   /** React on changes. Returns an unsubscribe function. */
   on(k: (s: S) => void): () => void {
     return this.listen(() => k(this.get()))
+  }
+
+  /** Start a new transaction: listeners are only invoked when the
+  (top-level) transaction finishes, and not on set (and modify) inside the transaction. */
+  transaction<A>(m: () => A): A {
+    let a: A | undefined
+    this.transact(() => {
+      a = m()
+    })
+    return a as A // unsafe cast, but safe because transact will run m (exactly once)
   }
 
   /** Zoom in on a subpart of the store via a lens */
@@ -180,7 +176,9 @@ export class Store<S> {
       })
   }
 
-  /** Apply a lens along one field, keep the rest of the shape intact */
+  /** Apply a lens along one field, keep the rest of the shape intact
+
+  To consider: change `i` to `Store<B>`*/
   along<K extends keyof S, Ks extends keyof S, B>(k: K, i: Lens<S[K], B>, ...keep: Ks[]): Store<{[k in K]: B} & {[k in Ks]: S[k]}> {
     return this.zoom(Lens.along(this)(k, i, ...keep))
   }
@@ -198,7 +196,7 @@ export class Store<S> {
   }
 }
 
-/** A simple lens */
+/** A lens */
 export interface Lens<S, T> {
   /** Get the current value */
   get(s: S): T,
@@ -207,7 +205,7 @@ export interface Lens<S, T> {
   set(s: S, t: T): S
 }
 
-/** Utility functions on lenses */
+/** Common lens constructors and functions */
 export module Lens {
   /** Make a lens from a getter and setter
 
@@ -248,9 +246,9 @@ export module Lens {
                 // unsafe cast // safe cast
   }
 
-  /** Make an isomorphism. Every isomorphism is a lens.
+  /** Make a lens from an isomorphism.
 
-  Note: requires that for all s and t we have f(g(t)) = t and g(f(s)) = s */
+  Note: requires that for all `s` and `t` we have `f(g(t)) = t` and `g(f(s)) = s` */
   export function iso<S, T>(f: (s: S) => T, g: (t: T) => S): Lens<S, T> {
     return lens(f, (_s: S, t: T) => g(t))
   }
@@ -351,18 +349,6 @@ export module Lens {
   }
 }
 
-/** History zipper */
-export interface Undo<S> {
-  readonly tip: Stack<S>,
-  readonly next: null | Stack<S>,
-}
-
-/** A non-empty stack */
-export interface Stack<S> {
-  readonly top: S
-  readonly pop: null | Stack<S>
-}
-
 /** History zipper functions
 
 Todo: document this without puns and semi-obscure references */
@@ -414,5 +400,17 @@ export module Undo {
       (h, v) => ({tip: {top: v, pop: h.tip.pop}, next: h.next})
     )
   }
+}
+
+/** History zipper */
+export interface Undo<S> {
+  readonly tip: Stack<S>,
+  readonly next: null | Stack<S>,
+}
+
+/** A non-empty stack */
+export interface Stack<S> {
+  readonly top: S
+  readonly pop: null | Stack<S>
 }
 

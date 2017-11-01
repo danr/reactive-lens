@@ -29,25 +29,23 @@ Store for some state
 
 Store laws (assuming no listeners):
 
-```
-s.set(a).get() = a
-
-s.set(s.get()).get() = s.get()
-
-s.set(a).set(b).get() = s.set(b).get()
-```
+> `s.set(a).get() = a`
+>
+> `s.set(s.get()).get() = s.get()`
+>
+> `s.set(a).set(b).get() = s.set(b).get()`
 
 Store laws with listeners:
 
-```
-s.transaction(() => s.set(a).get()) = a
-
-s.transaction(() => s.set(s.get()).get()) = s.get()
-
-s.transaction(() => s.set(a).set(b).get()) = s.set(b).get()
-```
+> `s.transaction(() => s.set(a).get()) = a`
+>
+> `s.transaction(() => s.set(s.get()).get()) = s.get()`
+>
+> `s.transaction(() => s.set(a).set(b).get()) = s.set(b).get()`
 
 A store is a partially applied, existentially quantified lens with a change listener.
+
+### class Store\<S>.static init
 
 ```typescript
 static init<S>(s0: S): Store<S>
@@ -55,18 +53,23 @@ static init<S>(s0: S): Store<S>
 
 Make the root store
 
-```typescript
-transaction<A>(m: () => A): A
-```
 
-Start a new transaction: listeners are only invoked when the
-(top-level) transaction finishes, and not on set (and modify) inside the transaction.
+
+
+
+### class Store\<S>.get
 
 ```typescript
 get(): S
 ```
 
 Get the current value (which must not be mutated)
+
+
+
+
+
+### class Store\<S>.set
 
 ```typescript
 set(s: S): Store<S>
@@ -76,6 +79,12 @@ Set the value
 
 Returns itself.
 
+
+
+
+
+### class Store\<S>.modify
+
 ```typescript
 modify(f: (s: S) => S): Store<S>
 ```
@@ -84,17 +93,48 @@ Modify the value in the store (must not use mutation: construct a new value)
 
 Returns itself.
 
+
+
+
+
+### class Store\<S>.on
+
 ```typescript
 on(k: (s: S) => void): () => void
 ```
 
 React on changes. Returns an unsubscribe function.
 
+
+
+
+
+### class Store\<S>.transaction
+
+```typescript
+transaction<A>(m: () => A): A
+```
+
+Start a new transaction: listeners are only invoked when the
+(top-level) transaction finishes, and not on set (and modify) inside the transaction.
+
+
+
+
+
+### class Store\<S>.zoom
+
 ```typescript
 zoom<T>(lens: Lens<S, T>): Store<T>
 ```
 
 Zoom in on a subpart of the store via a lens
+
+
+
+
+
+### class Store\<S>.at
 
 ```typescript
 at<K extends keyof S>(k: K): Store<S[K]>
@@ -104,6 +144,12 @@ Make a substore at a key
 
 Note: the key must always be present.
 
+
+
+
+
+### class Store\<S>.pick
+
 ```typescript
 pick<Ks extends keyof S>(...ks: Ks[]): Store<{ [K in Ks]: S[K]; }>
 ```
@@ -111,6 +157,12 @@ pick<Ks extends keyof S>(...ks: Ks[]): Store<{ [K in Ks]: S[K]; }>
 Make a substore by picking many keys
 
 Note: the keys must always be present.
+
+
+
+
+
+### class Store\<S>.relabel
 
 ```typescript
 relabel<T>(lenses: { [K in keyof T]: Store<T[K]>; }): Store<T>
@@ -120,15 +172,30 @@ Make a substore by relabelling
 
 Note: must not use the same part of the store several times.
 
+
+
+
+
+### class Store\<S>.along
+
 ```typescript
-along<K extends keyof S, Ks extends keyof S, B>(k: K, i: Lens<S[K], B>, ...keep: Ks[]): Store<{ [k in K]: B; } & { [k in Ks]: S[k]; }>
+along<K extends keyof S, Ks extends keyof S, B>(k: K, i: Lens<S[K], B>, ...keep: Ks[]):
+  Store<{ [k in K]: B; } & { [k in Ks]: S[k]; }>
 ```
 
 Apply a lens along one field, keep the rest of the shape intact
 
-#### static partial
+To consider: change `i` to `Store<B>`
+
+
+
+
+
+### class Store\<S>.static partial
 
 Partial substore makers
+
+### class Store\<S>.static partial.each
 
 ```typescript
 each<A>(store: Store<A[]>): Store<A>[]
@@ -138,9 +205,19 @@ Get partial stores for each position currently in the array
 
 Note: exceptions are thrown when looking outside the array.
 
+
+
+
+
+
+
+
+
 ### interface Lens\<S, T>
 
-A simple lens
+A lens
+
+### interface Lens\<S, T>.get
 
 ```typescript
 get(s: S): T
@@ -148,15 +225,29 @@ get(s: S): T
 
 Get the current value
 
+
+
+
+
+### interface Lens\<S, T>.set
+
 ```typescript
 set(s: S, t: T): S
 ```
 
 Set the current value
 
+
+
+
+
+
+
 ### module Lens
 
-Utility functions on lenses
+Common lens constructors and functions
+
+### Lens.lens
 
 ```typescript
 function lens<S, T>(get: (s: S) => T, set: (s: S, t: T) => S): Lens<S, T>
@@ -166,6 +257,12 @@ Make a lens from a getter and setter
 
 Note: lenses are subject to three lens laws
 
+
+
+
+
+### Lens.relabel
+
 ```typescript
 function relabel<S, T>(lenses: { [K in keyof T]: Lens<S, T[K]>; }): Lens<S, T>
 ```
@@ -173,6 +270,12 @@ function relabel<S, T>(lenses: { [K in keyof T]: Lens<S, T[K]>; }): Lens<S, T>
 Lens from a record of lenses
 
 Note: must not use the same part of the store several times.
+
+
+
+
+
+### Lens.at
 
 ```typescript
 function at<S, K extends keyof S>(k: K): Lens<S, S[K]>
@@ -182,13 +285,25 @@ Lens to a key in a record
 
 Note: the key must always be present.
 
+
+
+
+
+### Lens.iso
+
 ```typescript
 function iso<S, T>(f: (s: S) => T, g: (t: T) => S): Lens<S, T>
 ```
 
-Make an isomorphism. Every isomorphism is a lens.
+Make a lens from an isomorphism.
 
-Note: requires that for all s and t we have f(g(t)) = t and g(f(s)) = s
+Note: requires that for all `s` and `t` we have `f(g(t)) = t` and `g(f(s)) = s`
+
+
+
+
+
+### Lens.pick
 
 ```typescript
 function pick<S, Ks extends keyof S>(...keys: Ks[]): Lens<S, { [K in Ks]: S[K]; }>
@@ -198,6 +313,12 @@ Lens to a keys in a record
 
 Note: the keys must always be present.
 
+
+
+
+
+### Lens.key
+
 ```typescript
 function key<S, K extends keyof S>(k: K): Lens<S, S[K] | undefined>
 ```
@@ -206,11 +327,23 @@ Lens to a key in a record which may be missing
 
 Note: setting the value to undefined removes the key from the record.
 
+
+
+
+
+### Lens.def
+
 ```typescript
 function def<A>(missing: A): Lens<A | undefined, A>
 ```
 
 Lens which refer to a default value instead of undefined
+
+
+
+
+
+### Lens.seq
 
 ```typescript
 function seq<S, T, U>(lens1: Lens<S, T>, lens2: Lens<T, U>): Lens<S, U>
@@ -218,21 +351,41 @@ function seq<S, T, U>(lens1: Lens<S, T>, lens2: Lens<T, U>): Lens<S, U>
 
 Compose two lenses sequentially
 
+
+
+
+
+### Lens.arr
+
 ```typescript
 function arr<A, K extends keyof Array<A>>(store: Store<Array<A>>, k: K): Array<A>[K]
 ```
 
 Set using an array method (purity is ensured because the spine is copied before running the function)
 
+
+
+
+
+### Lens.along
+
 ```typescript
-function along<S>(type_hint?: Store<S> | (() => S)): <K extends keyof S, Ks extends keyof S, B>(k: K, i: Lens<S[K], B>, ...keep: Ks[]) => Lens<S, { [k in K]: B; } & { [k in Ks]: S[k]; }>
+function along<S>(type_hint?: Store<S> | (() => S)):
+  <K extends keyof S, Ks extends keyof S, B>(k: K, i: Lens<S[K], B>, ...keep: Ks[]) =>
+  Lens<S, { [k in K]: B; } & { [k in Ks]: S[k]; }>
 ```
 
 Apply a lens along one field, keep the rest of the shape intact
 
-#### module partial
+
+
+
+
+### Lens.module partial
 
 Partial lenses
+
+### Lens.partial.index
 
 ```typescript
 function index<A>(i: number): Lens<A[], A>
@@ -242,15 +395,11 @@ Partial lens to a particular index in an array
 
 Note: an exception is thrown if you look outside the array.
 
-### interface Undo\<S>
-
-History zipper
 
 
 
-### interface Stack\<S>
 
-A non-empty stack
+
 
 
 
@@ -260,11 +409,19 @@ History zipper functions
 
 Todo: document this without puns and semi-obscure references
 
+### Undo.undo
+
 ```typescript
 function undo<S>(h: Undo<S>): Undo<S>
 ```
 
 Undo iff there is a past
+
+
+
+
+
+### Undo.redo
 
 ```typescript
 function redo<S>(h: Undo<S>): Undo<S>
@@ -272,11 +429,23 @@ function redo<S>(h: Undo<S>): Undo<S>
 
 Redo iff there is a future
 
+
+
+
+
+### Undo.advance
+
 ```typescript
 function advance<S>(h: Undo<S>): Undo<S>
 ```
 
 Advances the history by copying the present
+
+
+
+
+
+### Undo.init
 
 ```typescript
 function init<S>(now: S): Undo<S>
@@ -284,9 +453,82 @@ function init<S>(now: S): Undo<S>
 
 Make history
 
+
+
+
+
+### Undo.now
+
 ```typescript
 function now<S>(): Lens<Undo<S>, S>
 ```
 
 Lens to the present moment
+
+
+
+
+
+
+
+### interface Undo\<S>
+
+History zipper
+
+### interface Undo\<S>.tip
+
+```typescript
+tip: Stack<S>
+```
+
+
+
+
+
+
+
+### interface Undo\<S>.next
+
+```typescript
+next: null | Stack<S>
+```
+
+
+
+
+
+
+
+
+
+### interface Stack\<S>
+
+A non-empty stack
+
+### interface Stack\<S>.top
+
+```typescript
+top: S
+```
+
+
+
+
+
+
+
+### interface Stack\<S>.pop
+
+```typescript
+pop: null | Stack<S>
+```
+
+
+
+
+
+
+
+
+
 
