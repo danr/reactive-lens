@@ -106,6 +106,17 @@ export class Store<S> {
     return this
   }
 
+  /** Update some parts of the state, keep the rest constant
+
+  Returns itself. */
+  update<K extends keyof S>(parts: {[k in K]: S[K]}): Store<S> {
+    const keys = Object.keys(parts) as (keyof S)[]
+    this.transact(() => {
+      keys.forEach(k => this.at(k).set(parts[k]))
+    })
+    return this
+  }
+
   /** Modify the value in the store (must not use mutation: construct a new value)
 
   Returns itself. */

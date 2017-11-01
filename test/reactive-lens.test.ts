@@ -26,7 +26,7 @@ function init<S>(s0: S, assert: test.Test): {store: Store<S>, after(s: string, x
     assert.deepEqual(current, x, 'after ' + s)
     oracle_count += count
     assert.equal(transaction_count, oracle_count,
-      count + ' new transaction' + (count > 1 ? 's' : ''))
+      count + ' new transaction' + (count != 1 ? 's' : ''))
   }
   return {
     store,
@@ -203,6 +203,21 @@ test('pick', assert => {
   test_laws(gh, {g: 8, h: 9}, {g: 5, h: 6})
   assert.end()
 })
+
+test('update', assert => {
+  const s0 = {k: 1, g: 2, h: 3}
+  const {store, after} = init(s0, assert)
+  store.update({k: 4})
+  after('update', {k: 4, g: 2, h: 3})
+  store.update({k: 5, g: 6})
+  after('update', {k: 5, g: 6, h: 3})
+  store.update({h: 7})
+  after('update', {k: 5, g: 6, h: 7})
+  store.update({})
+  after('update', {k: 5, g: 6, h: 7}, 0)
+  assert.end()
+})
+
 
 test('seq', assert => {
   const {store, after, test_laws} = init(1, assert)

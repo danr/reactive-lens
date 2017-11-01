@@ -83,6 +83,20 @@ Returns itself.
 
 
 
+### class Store\<S>.update
+
+```typescript
+update<K extends keyof S>(parts: { [k in K]: S[K]; }): Store<S>
+```
+
+Update some parts of the state, keep the rest constant
+
+Returns itself.
+
+
+
+
+
 ### class Store\<S>.modify
 
 ```typescript
