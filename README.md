@@ -165,7 +165,7 @@ Note: the keys must always be present.
 ### class Store\<S>.relabel
 
 ```typescript
-relabel<T>(lenses: { [K in keyof T]: Store<T[K]>; }): Store<T>
+relabel<T>(stores: { [K in keyof T]: Store<T[K]>; }): Store<T>
 ```
 
 Make a substore by relabelling
@@ -179,13 +179,25 @@ Note: must not use the same part of the store several times.
 ### class Store\<S>.along
 
 ```typescript
-along<K extends keyof S, Ks extends keyof S, B>(k: K, i: Lens<S[K], B>, ...keep: Ks[]):
+along<K extends keyof S, Ks extends keyof S, B>(k: K, s: Store<B>, ...keep: Ks[]):
   Store<{ [k in K]: B; } & { [k in Ks]: S[k]; }>
 ```
 
-Apply a lens along one field, keep the rest of the shape intact
+Replace the substore at one field and keep the rest of the shape intact
 
-To consider: change `i` to `Store<B>`
+Note: must not use the same part of the store several times.
+
+
+
+
+
+### class Store\<S>.static arr
+
+```typescript
+static arr<A, K extends keyof Array<A>>(store: Store<Array<A>>, k: K): Array<A>[K]
+```
+
+Set the value using an array method (purity is ensured because the spine is copied before running the function)
 
 
 
@@ -215,7 +227,15 @@ Note: exceptions are thrown when looking outside the array.
 
 ### interface Lens\<S, T>
 
-A lens
+A lens: allows you to operate on a subpart `T` of some data `S`
+
+Lenses must conform to these three lens laws:
+
+> `l.get(l.set(s, t)) = t`
+>
+> `l.set(s, l.get(s)) = s`
+>
+> `l.set(l.set(s, a), b) = l.set(s, b)`
 
 ### interface Lens\<S, T>.get
 
@@ -223,7 +243,7 @@ A lens
 get(s: S): T
 ```
 
-Get the current value
+Get the value via the lens
 
 
 
@@ -235,7 +255,7 @@ Get the current value
 set(s: S, t: T): S
 ```
 
-Set the current value
+Set the value via the lens
 
 
 
@@ -255,7 +275,7 @@ function lens<S, T>(get: (s: S) => T, set: (s: S, t: T) => S): Lens<S, T>
 
 Make a lens from a getter and setter
 
-Note: lenses are subject to three lens laws
+Note: lenses are subject to the three lens laws
 
 
 
@@ -350,32 +370,6 @@ function seq<S, T, U>(lens1: Lens<S, T>, lens2: Lens<T, U>): Lens<S, U>
 ```
 
 Compose two lenses sequentially
-
-
-
-
-
-### Lens.arr
-
-```typescript
-function arr<A, K extends keyof Array<A>>(store: Store<Array<A>>, k: K): Array<A>[K]
-```
-
-Set using an array method (purity is ensured because the spine is copied before running the function)
-
-
-
-
-
-### Lens.along
-
-```typescript
-function along<S>(type_hint?: Store<S> | (() => S)):
-  <K extends keyof S, Ks extends keyof S, B>(k: K, i: Lens<S[K], B>, ...keep: Ks[]) =>
-  Lens<S, { [k in K]: B; } & { [k in Ks]: S[k]; }>
-```
-
-Apply a lens along one field, keep the rest of the shape intact
 
 
 

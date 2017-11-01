@@ -155,32 +155,53 @@ export class Store<S> {
   /** Make a substore by relabelling
 
   Note: must not use the same part of the store several times. */
-  relabel<T>(lenses: {[K in keyof T]: Store<T[K]>}): Store<T> {
-    const keys = Object.keys(lenses) as (keyof T)[]
+  relabel<T>(stores: {[K in keyof T]: Store<T[K]>}): Store<T> {
+    const keys = Object.keys(stores) as (keyof T)[]
     return new Store(
       this.transact,
       this.listen,
       () => {
         const ret = {} as T
         keys.forEach(k => {
-          ret[k] = lenses[k].get()
+          ret[k] = stores[k].get()
         })
         return ret
       },
       (t: T) => {
         this.transact(() => {
           keys.forEach(k => {
-            lenses[k].set(t[k])
+            stores[k].set(t[k])
           })
         })
       })
   }
 
-  /** Apply a lens along one field, keep the rest of the shape intact
+  /** Replace the substore at one field and keep the rest of the shape intact
 
-  To consider: change `i` to `Store<B>`*/
-  along<K extends keyof S, Ks extends keyof S, B>(k: K, i: Lens<S[K], B>, ...keep: Ks[]): Store<{[k in K]: B} & {[k in Ks]: S[k]}> {
-    return this.zoom(Lens.along(this)(k, i, ...keep))
+  Note: must not use the same part of the store several times. */
+  along<K extends keyof S, Ks extends keyof S, B>(k: K, s: Store<B>, ...keep: Ks[]): Store<{[k in K]: B} & {[k in Ks]: S[k]}> {
+    return new Store(
+      this.transact,
+      this.listen,
+      () => ({...(this.get() as any), [k as any]: s.get()}),
+      (t: {[K in Ks]: S[K]} & {[k in K]: B}) => {
+        this.transact(() => {
+          s.set((t as {[k in K]: B})[k])
+          keep.forEach((k: Ks) => {
+            this.at(k).set((t as {[K in Ks]: S[K]})[k])
+          })
+        })
+      })
+  }
+
+  /** Set the value using an array method (purity is ensured because the spine is copied before running the function) */
+  static arr<A, K extends keyof Array<A>>(store: Store<Array<A>>, k: K): Array<A>[K] {
+    return (...args: any[]) => {
+      const xs = store.get().slice()
+      const ret = (xs[k] as any)(...args)
+      store.set(xs)
+      return ret
+    }
   }
 
   /** Partial substore makers */
@@ -196,12 +217,21 @@ export class Store<S> {
   }
 }
 
-/** A lens */
+/** A lens: allows you to operate on a subpart `T` of some data `S`
+
+Lenses must conform to these three lens laws:
+
+> `l.get(l.set(s, t)) = t`
+>
+> `l.set(s, l.get(s)) = s`
+>
+> `l.set(l.set(s, a), b) = l.set(s, b)`
+*/
 export interface Lens<S, T> {
-  /** Get the current value */
+  /** Get the value via the lens */
   get(s: S): T,
 
-  /** Set the current value*/
+  /** Set the value via the lens */
   set(s: S, t: T): S
 }
 
@@ -209,7 +239,7 @@ export interface Lens<S, T> {
 export module Lens {
   /** Make a lens from a getter and setter
 
-  Note: lenses are subject to three lens laws */
+  Note: lenses are subject to the three lens laws */
   export function lens<S, T>(get: (s: S) => T, set: (s: S, t: T) => S): Lens<S, T> {
     return {get, set}
   }
@@ -302,28 +332,6 @@ export module Lens {
       (s: S) => lens2.get(lens1.get(s)),
       (s: S, u: U) => lens1.set(s, lens2.set(lens1.get(s), u))
     )
-  }
-
-  /** Set using an array method (purity is ensured because the spine is copied before running the function) */
-  export function arr<A, K extends keyof Array<A>>(store: Store<Array<A>>, k: K): Array<A>[K] {
-    return (...args: any[]) => {
-      const xs = store.get().slice()
-      const ret = (xs[k] as any)(...args)
-      store.set(xs)
-      return ret
-    }
-  }
-
-  /** Apply a lens along one field, keep the rest of the shape intact */
-  export function along<S>(type_hint?: Store<S> | (() => S)): <K extends keyof S, Ks extends keyof S, B>(k: K, i: Lens<S[K], B>, ...keep: Ks[]) => Lens<S, {[k in K]: B} & {[k in Ks]: S[k]}> {
-    function ret<K extends keyof S, Ks extends keyof S, B>(k: K, i: Lens<S[K], B>, ...keep: Ks[]): Lens<S, {[k in K]: B} & {[k in Ks]: S[k]}> {
-      return lens(
-        (s: S) => ({...(s as any), [k as any]: i.get(s[k])}),
-        (s: S,
-         t: {[K in Ks]: S[K]} & {[k in K]: B}) => ({...(t as any), [k as any]: i.set(s[k], (t as {[k in K]: B})[k])})
-      )
-    }
-    return ret
   }
 
   /** Partial lenses */

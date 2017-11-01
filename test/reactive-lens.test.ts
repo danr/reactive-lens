@@ -149,7 +149,7 @@ test('key', assert => {
 
 test('arr', assert => {
   const {store, after} = init([0,1,2,3,4], assert)
-  assert.deepEqual(L.arr(store, 'splice')(1,3,9,10), [1,2,3], 'return value')
+  assert.deepEqual(Store.arr(store, 'splice')(1,3,9,10), [1,2,3], 'return value')
   after('splicing', [0,9,10,4])
   assert.end()
 })
@@ -157,13 +157,15 @@ test('arr', assert => {
 test('along', assert => {
   const s0 = {k: {a: 1, b: 2}, g: 3}
   const {store, after, test_laws} = init(s0, assert)
-  const kag = store.along('k', L.at('a'), 'g')
+  const kag = store.along('k', store.at('k').at('a'), 'g')
   kag.set({k: 10, g: 30})
   after('along', {k: {a: 10, b: 2}, g: 30})
   test_laws(kag, {k: 9, g: 8}, {k: 7, g: 6})
+  /*
   const kbg = store.zoom(L.along<typeof s0>()('k', L.at<typeof s0.k, 'b'>('b'), 'g'))
   kbg.set({k: 20, g: 40})
   after('zoom along', {k: {a: 10, b: 20}, g: 40})
+  */
   test_laws(kag, {k: 9, g: 8}, {k: 7, g: 6})
   assert.end()
 })
@@ -171,7 +173,7 @@ test('along', assert => {
 test('along along', assert => {
   const s0 = {k: {a: {u: 1, v: 2}, b: 3}, g: 4}
   const {store, after, test_laws} = init(s0, assert)
-  const kag = store.along('k', L.along<typeof s0.k>()('a', L.at<typeof s0.k.a, 'u'>('u'), 'b'), 'g')
+  const kag = store.along('k', store.at('k').along('a', store.at('k').at('a').at('u'), 'b'), 'g')
   kag.set({k: {a: 10, b: 30}, g: 40})
   after('along', {k: {a: {u: 10, v: 2}, b: 30}, g: 40})
   test_laws(kag, {k: {a: 9, b: 8}, g: 7}, {k: {a: 6, b: 5}, g: 4})
