@@ -3,19 +3,19 @@
 
 Store laws (assuming no listeners):
 
-> `s.set(a).get() = a`
->
-> `s.set(s.get()).get() = s.get()`
->
-> `s.set(a).set(b).get() = s.set(b).get()`
+* `s.set(a).get() = a`
+
+* `s.set(s.get()).get() = s.get()`
+
+* `s.set(a).set(b).get() = s.set(b).get()`
 
 Store laws with listeners:
 
-> `s.transaction(() => s.set(a).get()) = a`
->
-> `s.transaction(() => s.set(s.get()).get()) = s.get()`
->
-> `s.transaction(() => s.set(a).set(b).get()) = s.set(b).get()`
+* `s.transaction(() => s.set(a).get()) = a`
+
+* `s.transaction(() => s.set(s.get()).get()) = s.get()`
+
+* `s.transaction(() => s.set(a).set(b).get()) = s.set(b).get()`
 
 A store is a partially applied, existentially quantified lens with a change listener.
 */
@@ -180,18 +180,9 @@ export class Store<S> {
 
   Note: must not use the same part of the store several times. */
   along<K extends keyof S, Ks extends keyof S, B>(k: K, s: Store<B>, ...keep: Ks[]): Store<{[k in K]: B} & {[k in Ks]: S[k]}> {
-    return new Store(
-      this.transact,
-      this.listen,
-      () => ({...(this.get() as any), [k as any]: s.get()}),
-      (t: {[K in Ks]: S[K]} & {[k in K]: B}) => {
-        this.transact(() => {
-          s.set((t as {[k in K]: B})[k])
-          keep.forEach((k: Ks) => {
-            this.at(k).set((t as {[K in Ks]: S[K]})[k])
-          })
-        })
-      })
+    const identities = {} as {[k in Ks]: Store<S[k]>}
+    keep.forEach(k => identities[k] = this.at(k))
+    return this.relabel({[k as string]: s, ...(identities as any)})
   }
 
   /** Set the value using an array method (purity is ensured because the spine is copied before running the function) */
@@ -221,11 +212,11 @@ export class Store<S> {
 
 Lenses must conform to these three lens laws:
 
-> `l.get(l.set(s, t)) = t`
->
-> `l.set(s, l.get(s)) = s`
->
-> `l.set(l.set(s, a), b) = l.set(s, b)`
+* `l.get(l.set(s, t)) = t`
+
+* `l.set(s, l.get(s)) = s`
+
+* `l.set(l.set(s, a), b) = l.set(s, b)`
 */
 export interface Lens<S, T> {
   /** Get the value via the lens */

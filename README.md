@@ -29,19 +29,19 @@ Store for some state
 
 Store laws (assuming no listeners):
 
-> `s.set(a).get() = a`
->
-> `s.set(s.get()).get() = s.get()`
->
-> `s.set(a).set(b).get() = s.set(b).get()`
+* `s.set(a).get() = a`
+
+* `s.set(s.get()).get() = s.get()`
+
+* `s.set(a).set(b).get() = s.set(b).get()`
 
 Store laws with listeners:
 
-> `s.transaction(() => s.set(a).get()) = a`
->
-> `s.transaction(() => s.set(s.get()).get()) = s.get()`
->
-> `s.transaction(() => s.set(a).set(b).get()) = s.set(b).get()`
+* `s.transaction(() => s.set(a).get()) = a`
+
+* `s.transaction(() => s.set(s.get()).get()) = s.get()`
+
+* `s.transaction(() => s.set(a).set(b).get()) = s.set(b).get()`
 
 A store is a partially applied, existentially quantified lens with a change listener.
 
@@ -231,11 +231,11 @@ A lens: allows you to operate on a subpart `T` of some data `S`
 
 Lenses must conform to these three lens laws:
 
-> `l.get(l.set(s, t)) = t`
->
-> `l.set(s, l.get(s)) = s`
->
-> `l.set(l.set(s, a), b) = l.set(s, b)`
+* `l.get(l.set(s, t)) = t`
+
+* `l.set(s, l.get(s)) = s`
+
+* `l.set(l.set(s, a), b) = l.set(s, b)`
 
 ### interface Lens\<S, T>.get
 
