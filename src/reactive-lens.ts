@@ -3,19 +3,19 @@
 
 Store laws (assuming no listeners):
 
-* `s.set(a).get() = a`
+1. `s.set(a).get() = a`
 
-* `s.set(s.get()).get() = s.get()`
+2. `s.set(s.get()).get() = s.get()`
 
-* `s.set(a).set(b).get() = s.set(b).get()`
+3. `s.set(a).set(b).get() = s.set(b).get()`
 
 Store laws with listeners:
 
-* `s.transaction(() => s.set(a).get()) = a`
+1. `s.transaction(() => s.set(a).get()) = a`
 
-* `s.transaction(() => s.set(s.get()).get()) = s.get()`
+2. `s.transaction(() => s.set(s.get()).get()) = s.get()`
 
-* `s.transaction(() => s.set(a).set(b).get()) = s.set(b).get()`
+3. `s.transaction(() => s.set(a).set(b).get()) = s.set(b).get()`
 
 A store is a partially applied, existentially quantified lens with a change listener.
 */
@@ -134,7 +134,6 @@ export class Store<S> {
 
       const store = Store.init(1)
       let last
-      let middle
       store.on(x => last = x)
       store.transaction(() => {
         store.set(2)
@@ -152,7 +151,17 @@ export class Store<S> {
     return a as A // unsafe cast, but safe because transact will run m (exactly once)
   }
 
-  /** Zoom in on a subpart of the store via a lens */
+  /** Zoom in on a subpart of the store via a lens
+
+      const store = Store.init({a: 1, b: 2} as Record<string, number>)
+      const a_store = store.zoom(Lens.key('a'))
+      a_store.set(3)
+      store.get() // => {a: 3, b: 2}
+      a_store.get() // => 3
+      a_store.set(undefined)
+      store.get() // => {b: 2}
+
+  */
   zoom<T>(lens: Lens<S, T>) {
     return new Store(
       this.transact,
@@ -163,6 +172,11 @@ export class Store<S> {
 
   /** Make a substore at a key
 
+      const store = Store.init({a: 1, b: 2})
+      store.at('a').set(3)
+      store.get() // => {a: 3, b: 2}
+      store.at('a').get() // => 3
+
   Note: the key must always be present. */
   at<K extends keyof S>(k: K): Store<S[K]> {
     return this.zoom(Lens.at(k))
@@ -170,12 +184,23 @@ export class Store<S> {
 
   /** Make a substore by picking many keys
 
+      const store = Store.init({a: 1, b: 2, c: 3})
+      store.pick('a', 'b').get() // => {a: 1, b: 2}
+      store.pick('a', 'b').set({a: 5, b: 4})
+      store.get() // => {a: 5, b: 4, c: 3}
+
   Note: the keys must always be present. */
   pick<Ks extends keyof S>(...ks: Ks[]): Store<{[K in Ks]: S[K]}> {
     return this.zoom(Lens.pick(...ks))
   }
 
   /** Make a substore by relabelling
+
+      const store = Store.init({a: 1, b: 2, c: 3})
+      const other = store.relabel({x: store.at('a'), y: store.at('b')})
+      other.get() // => {x: 1, y: 2}
+      other.set({x: 5, y: 4})
+      store.get() // => {a: 5, b: 4, c: 3}
 
   Note: must not use the same part of the store several times. */
   relabel<T>(stores: {[K in keyof T]: Store<T[K]>}): Store<T> {
@@ -201,6 +226,12 @@ export class Store<S> {
 
   /** Replace the substore at one field and keep the rest of the shape intact
 
+      const store = Store.init({a: {x: 1, y: 2}, b: 3})
+      const other = store.along('a', store.at('a').at('y'), 'b')
+      other.get() // => {a: 2, b: 3}
+      other.set({a: 4, b: 7})
+      store.get() // => {a: {x: 1, y: 4}, b: 7}
+
   Note: must not use the same part of the store several times. */
   along<K extends keyof S, Ks extends keyof S, B>(k: K, s: Store<B>, ...keep: Ks[]): Store<{[k in K]: B} & {[k in Ks]: S[k]}> {
     const identities = {} as {[k in Ks]: Store<S[k]>}
@@ -209,6 +240,10 @@ export class Store<S> {
   }
 
   /** Set the value using an array method (purity is ensured because the spine is copied before running the function)
+
+      const store = Store.init([0, 1, 2, 3])
+      Store.arr(store, 'splice')(1, 2, 9, 6) // => [1, 2]
+      store.get() // => [0, 9, 6, 3]
 
   (static method) */
   static arr<A, K extends keyof Array<A>>(store: Store<Array<A>>, k: K): Array<A>[K] {
@@ -221,6 +256,10 @@ export class Store<S> {
   }
 
   /** Get partial stores for each position currently in the array
+
+      const store = Store.init([0, 1, 2, 3])
+      Store.each(store).map((substore, i) => substore.modify(x => x + i))
+      store.get() // => [0, 2, 4, 6]
 
   (static method)
 

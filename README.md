@@ -70,19 +70,19 @@ Store for some state
 
 Store laws (assuming no listeners):
 
-`s.set(a).get() = a`
+1. `s.set(a).get() = a`
 
-`s.set(s.get()).get() = s.get()`
+2. `s.set(s.get()).get() = s.get()`
 
-`s.set(a).set(b).get() = s.set(b).get()`
+3. `s.set(a).set(b).get() = s.set(b).get()`
 
 Store laws with listeners:
 
-`s.transaction(() => s.set(a).get()) = a`
+1. `s.transaction(() => s.set(a).get()) = a`
 
-`s.transaction(() => s.set(s.get()).get()) = s.get()`
+2. `s.transaction(() => s.set(s.get()).get()) = s.get()`
 
-`s.transaction(() => s.set(a).set(b).get()) = s.set(b).get()`
+3. `s.transaction(() => s.set(a).set(b).get()) = s.set(b).get()`
 
 A store is a partially applied, existentially quantified lens with a change listener.
 * **init**: `<S>(s0: S) => Store<S>`
@@ -155,7 +155,6 @@ A store is a partially applied, existentially quantified lens with a change list
   ```typescript
   const store = Store.init(1)
   let last
-  let middle
   store.on(x => last = x)
   store.transaction(() => {
     store.set(2)
@@ -167,34 +166,86 @@ A store is a partially applied, existentially quantified lens with a change list
 * **zoom**: `<T>(lens: Lens<S, T>) => Store<T>`
 
   Zoom in on a subpart of the store via a lens
+
+  ```typescript
+  const store = Store.init({a: 1, b: 2} as Record<string, number>)
+  const a_store = store.zoom(Lens.key('a'))
+  a_store.set(3)
+  store.get() // => {a: 3, b: 2}
+  a_store.get() // => 3
+  a_store.set(undefined)
+  store.get() // => {b: 2}
+  ```
 * **at**: `<K extends keyof S>(k: K) => Store<S[K]>`
 
   Make a substore at a key
+
+  ```typescript
+  const store = Store.init({a: 1, b: 2})
+  store.at('a').set(3)
+  store.get() // => {a: 3, b: 2}
+  store.at('a').get() // => 3
+  ```
 
   Note: the key must always be present.
 * **pick**: `<Ks extends keyof S>(...ks: Array<Ks>) => Store<{ [K in Ks]: S[K]; }>`
 
   Make a substore by picking many keys
 
+  ```typescript
+  const store = Store.init({a: 1, b: 2, c: 3})
+  store.pick('a', 'b').get() // => {a: 1, b: 2}
+  store.pick('a', 'b').set({a: 5, b: 4})
+  store.get() // => {a: 5, b: 4, c: 3}
+  ```
+
   Note: the keys must always be present.
 * **relabel**: `<T>(stores: { [K in keyof T]: Store<T[K]>; }) => Store<T>`
 
   Make a substore by relabelling
+
+  ```typescript
+  const store = Store.init({a: 1, b: 2, c: 3})
+  const other = store.relabel({x: store.at('a'), y: store.at('b')})
+  other.get() // => {x: 1, y: 2}
+  other.set({x: 5, y: 4})
+  store.get() // => {a: 5, b: 4, c: 3}
+  ```
 
   Note: must not use the same part of the store several times.
 * **along**: `<K extends keyof S, Ks extends keyof S, B>(k: K, s: Store<B>, ...keep: Array<Ks>) => Store<{ [k in K]: B; } & { [k in Ks]: S[k]; }>`
 
   Replace the substore at one field and keep the rest of the shape intact
 
+  ```typescript
+  const store = Store.init({a: {x: 1, y: 2}, b: 3})
+  const other = store.along('a', store.at('a').at('y'), 'b')
+  other.get() // => {a: 2, b: 3}
+  other.set({a: 4, b: 7})
+  store.get() // => {a: {x: 1, y: 4}, b: 7}
+  ```
+
   Note: must not use the same part of the store several times.
 * **arr**: `<A, K extends "length" | "toString" | "toLocaleString" | "push" | "pop" | "concat" | "join" | "reverse" | "shift" | "slice" | "sort" | "splice" | "unshift" | "indexOf" | "lastIndexOf" | "every" | "some" | "forEach" | "map" | "filter" | "reduce" | "reduceRight">(store: Store<Array<A>>, k: K) => Array<A>[K]`
 
   Set the value using an array method (purity is ensured because the spine is copied before running the function)
 
+  ```typescript
+  const store = Store.init([0, 1, 2, 3])
+  Store.arr(store, 'splice')(1, 2, 9, 6) // => [1, 2]
+  store.get() // => [0, 9, 6, 3]
+  ```
+
   (static method)
 * **each**: `<A>(store: Store<Array<A>>) => Array<Store<A>>`
 
   Get partial stores for each position currently in the array
+
+  ```typescript
+  const store = Store.init([0, 1, 2, 3])
+  Store.each(store).map((substore, i) => substore.modify(x => x + i))
+  store.get() // => [0, 2, 4, 6]
+  ```
 
   (static method)
 
