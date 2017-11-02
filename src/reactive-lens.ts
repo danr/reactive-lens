@@ -27,7 +27,7 @@ export class Store<S> {
     private readonly _set: (s: S) => void)
   { }
 
-  /** Make the root store */
+  /** Make the root store (static method) */
   static init<S>(s0: S): Store<S> {
     /** Current state */
     let s = s0
@@ -58,47 +58,25 @@ export class Store<S> {
         notify()
       }
     return new Store(transact, k => listeners.push(k), () => s, set)
-
-    /** List with iteration and O(1) push and remove */
-    function ListWithRemove<A>() {
-      const dict = {} as Record<string, A>
-      let order = [] as number[]
-      let next_unique = 0
-      let dirty = false
-
-      return {
-        /** Push a new element, returns the delete function */
-        push(a: A): () => void {
-          const id = next_unique++
-          dict[id] = a
-          order.push(id)
-          return () => {
-            delete dict[id]
-            dirty = true
-          }
-        },
-        /** Iterate over the elements */
-        iter(f: (a: A) => void): void {
-          if (dirty) {
-            order = order.filter(id => id in dict)
-            dirty = false
-          }
-          order.forEach(id => {
-            if (id in dict) {
-              f(dict[id])
-            }
-          })
-        }
-      }
-    }
   }
 
-  /** Get the current value (which must not be mutated) */
+  /** Get the current value (which must not be mutated)
+
+      const store = Store.init(1)
+      store.get()
+      // => 1
+
+  */
   get(): S {
     return this._get()
   }
 
   /** Set the value
+
+      const store = Store.init(1)
+      store.set(2)
+      store.get()
+      // => 2
 
   Returns itself. */
   set(s: S): Store<S> {
@@ -107,6 +85,11 @@ export class Store<S> {
   }
 
   /** Update some parts of the state, keep the rest constant
+
+      const store = Store.init({a: 1, b: 2})
+      store.update({a: 3})
+      store.get()
+      // => {a: 3, b: 2}
 
   Returns itself. */
   update<K extends keyof S>(parts: {[k in K]: S[K]}): Store<S> {
@@ -119,19 +102,48 @@ export class Store<S> {
 
   /** Modify the value in the store (must not use mutation: construct a new value)
 
+      const store = Store.init(1)
+      store.modify(x => x + 1)
+      store.get()
+      // => 2
+
   Returns itself. */
   modify(f: (s: S) => S): Store<S> {
     this.set(f(this.get()))
     return this
   }
 
-  /** React on changes. Returns an unsubscribe function. */
+  /** React on changes. Returns an unsubscribe function.
+
+      const store = Store.init(1)
+      let last
+      const off = store.on(x => last = x)
+      store.set(2)
+      last // => 2
+      off()
+      store.set(3)
+      last // => 2
+
+  */
   on(k: (s: S) => void): () => void {
     return this.listen(() => k(this.get()))
   }
 
   /** Start a new transaction: listeners are only invoked when the
-  (top-level) transaction finishes, and not on set (and modify) inside the transaction. */
+  (top-level) transaction finishes, and not on set (and modify) inside the transaction.
+
+      const store = Store.init(1)
+      let last
+      let middle
+      store.on(x => last = x)
+      store.transaction(() => {
+        store.set(2)
+        assert.equal(last, undefined)
+        return 3
+      })   // => 3
+      last // => 2
+
+  */
   transaction<A>(m: () => A): A {
     let a: A | undefined
     this.transact(() => {
@@ -196,7 +208,9 @@ export class Store<S> {
     return this.relabel({[k as string]: s, ...(identities as any)})
   }
 
-  /** Set the value using an array method (purity is ensured because the spine is copied before running the function) */
+  /** Set the value using an array method (purity is ensured because the spine is copied before running the function)
+
+  (static method) */
   static arr<A, K extends keyof Array<A>>(store: Store<Array<A>>, k: K): Array<A>[K] {
     return (...args: any[]) => {
       const xs = store.get().slice()
@@ -206,16 +220,13 @@ export class Store<S> {
     }
   }
 
-  /** Partial substore makers */
-  static readonly partial: {
-    /** Get partial stores for each position currently in the array
+  /** Get partial stores for each position currently in the array
 
-    Note: exceptions are thrown when looking outside the array. */
-    each<A>(store: Store<A[]>): Store<A>[]
-  } = {
-    each(store) {
-      return store.get().map((_, i) => store.zoom(Lens.partial.index(i)))
-    }
+  (static method)
+
+  Note: exceptions are thrown when looking outside the array. */
+  static each<A>(store: Store<A[]>): Store<A>[] {
+    return store.get().map((_, i) => store.zoom(Lens.index(i)))
   }
 }
 
@@ -336,26 +347,23 @@ export module Lens {
     )
   }
 
-  /** Partial lenses */
-  export module partial {
-    /** Partial lens to a particular index in an array
+  /** Partial lens to a particular index in an array
 
-    Note: an exception is thrown if you look outside the array. */
-    export function index<A>(i: number): Lens<A[], A> {
-      const within = (xs: A[]) => {
-        if (i < 0 || i >= xs.length) {
-          throw 'Out of bounds'
-        }
+  Note: an exception is thrown if you look outside the array. */
+  export function index<A>(i: number): Lens<A[], A> {
+    const within = (xs: A[]) => {
+      if (i < 0 || i >= xs.length) {
+        throw 'Out of bounds'
       }
-      return lens(
-        xs => (within(xs), xs[i]),
-        (xs, x) => {
-          within(xs)
-          const ys = xs.slice()
-          ys[i] = x
-          return ys
-        })
     }
+    return lens(
+      xs => (within(xs), xs[i]),
+      (xs, x) => {
+        within(xs)
+        const ys = xs.slice()
+        ys[i] = x
+        return ys
+      })
   }
 }
 
@@ -424,3 +432,35 @@ export interface Stack<S> {
   readonly pop: null | Stack<S>
 }
 
+/** List with iteration and O(1) push and remove */
+function ListWithRemove<A>() {
+  const dict = {} as Record<string, A>
+  let order = [] as number[]
+  let next_unique = 0
+  let dirty = false
+
+  return {
+    /** Push a new element, returns the delete function */
+    push(a: A): () => void {
+      const id = next_unique++
+      dict[id] = a
+      order.push(id)
+      return () => {
+        delete dict[id]
+        dirty = true
+      }
+    },
+    /** Iterate over the elements */
+    iter(f: (a: A) => void): void {
+      if (dirty) {
+        order = order.filter(id => id in dict)
+        dirty = false
+      }
+      order.forEach(id => {
+        if (id in dict) {
+          f(dict[id])
+        }
+      })
+    }
+  }
+}
