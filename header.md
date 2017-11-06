@@ -21,5 +21,4 @@ store.at('right').modify(increment)
 store.at('left').modify(decrement)
 ```
 
-## Documentation
 

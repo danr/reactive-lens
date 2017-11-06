@@ -21,7 +21,7 @@ store.at('right').modify(increment)
 store.at('left').modify(decrement)
 ```
 
-## Documentation
+
 
 ## API overview
 * class Store
@@ -58,12 +58,14 @@ store.at('left').modify(decrement)
   * advance
   * init
   * now
+  * advance_to
 * interface Undo
   * tip
   * next
 * interface Stack
   * top
   * pop
+## Documentation
 ### class Store
 
 Store for some state
@@ -303,6 +305,18 @@ Common lens constructors and functions
 * **def**: `<A>(missing: A) => Lens<A, A>`
 
   Lens which refer to a default value instead of undefined
+
+  ```typescript
+  const store = Store.init({a: 1, b: 2} as Record<string, number>)
+  const a_store = store.zoom(Lens.key('a')).zoom(Lens.def(0))
+  a_store.set(3)
+  store.get() // => {a: 3, b: 2}
+  a_store.get() // => 3
+  a_store.set(0)
+  store.get() // => {b: 2}
+  a_store.modify(x => x + 1)
+  store.get() // => {a: 1, b: 2}
+  ```
 * **seq**: `<S, T, U>(lens1: Lens<S, T>, lens2: Lens<T, U>) => Lens<S, U>`
 
   Compose two lenses sequentially
@@ -310,12 +324,41 @@ Common lens constructors and functions
 
   Partial lens to a particular index in an array
 
+  ```typescript
+  const store = Store.init([0, 1, 2, 3])
+  const first = store.zoom(Lens.index(0))
+  first.get() // => 0
+  first.set(99)
+  store.get() // => [99, 1, 2, 3]
+  ```
+
   Note: an exception is thrown if you look outside the array.
 ### module Undo
 
 History zipper functions
 
-Todo: document this without puns and semi-obscure references
+```typescript
+const {undo, redo, advance, advance_to} = Undo
+const store = Store.init(Undo.init({a: 1, b: 2}))
+const modify = op => store.modify(op)
+const now = store.zoom(Undo.now())
+now.get() // => {a: 1, b: 2}
+modify(advance_to({a: 3, b: 4}))
+now.get() // => {a: 3, b: 4}
+modify(undo)
+now.get() // => {a: 1, b: 2}
+modify(redo)
+now.get() // => {a: 3, b: 4}
+modify(advance)
+now.update({a: 5})
+now.get() // => {a: 5, b: 4}
+modify(undo)
+now.get() // => {a: 3, b: 4}
+modify(undo)
+now.get() // => {a: 1, b: 2}
+modify(undo)
+now.get() // => {a: 1, b: 2}
+```
 * **undo**: `<S>(h: Undo<S>) => Undo<S>`
 
   Undo iff there is a past
@@ -324,13 +367,16 @@ Todo: document this without puns and semi-obscure references
   Redo iff there is a future
 * **advance**: `<S>(h: Undo<S>) => Undo<S>`
 
-  Advances the history by copying the present
+  Advances the history by copying the present state
 * **init**: `<S>(now: S) => Undo<S>`
 
-  Make history
+  Initialise the history
 * **now**: `<S>() => Lens<Undo<S>, S>`
 
   Lens to the present moment
+* **advance_to**: `<S>(s: S) => (h: Undo<S>) => Undo<S>`
+
+  Advances the history to some new state
 ### interface Undo
 
 History zipper

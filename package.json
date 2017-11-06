@@ -13,14 +13,18 @@
     "tap-diff": "^0.1.1",
     "tape": "^4.8.0",
     "ts-node": "^3.3.0",
-    "typescript": "^2.4.2"
+    "typescript": "^2.4.2",
+    "uglify-js": "^3.1.7"
   },
   "scripts": {
-    "pretest": "typescript-doctest src/*.ts -o test/reactive-lens.doctest.ts -i 'import { Store, Lens } from \"../src/reactive-lens\"' && tsc test/*.ts",
+    "pretest": "> test/reactive-lens.doctest.ts typescript-doctest src/*.ts -s 'import { Store, Lens, Undo } from \"../src/reactive-lens\"' -t && tsc test/*.ts",
     "test": "tape test/*js | tap-diff",
     "precoverage": "tsc test/*.ts",
     "coverage": "covert test/*js",
-    "compile": "tsc"
+    "compile": "tsc",
+    "prebuild": "tsc",
+    "build": "uglifyjs reactive-lens.js --mangle --toplevel --compress > reactive-lens.min.js",
+    "readme": "> README.md typescript-doctest src/*.ts -i header.md -s '## API overview' --toc -s '## Documentation' --doc"
   },
   "keywords": [
     "state",
