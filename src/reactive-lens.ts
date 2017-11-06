@@ -23,7 +23,6 @@ export class Store<S> {
   private constructor(
     private readonly transact: (m: () => void) => void,
     private readonly listen: (k: () => void) => () => void,
-    private readonly _disconnect: () => void,
     private readonly _get: () => S,
     private readonly _set: (s: S) => void)
   { }
@@ -58,7 +57,7 @@ export class Store<S> {
         pending = true
         notify()
       }
-    return new Store(transact, k => listeners.push(k), listeners.clear, () => s, set)
+    return new Store(transact, k => listeners.push(k), () => s, set)
   }
 
   /** Get the current value (which must not be mutated)
@@ -167,7 +166,6 @@ export class Store<S> {
     return new Store(
       this.transact,
       this.listen,
-      this._disconnect,
       () => lens.get(this.get()),
       (t: T) => this.set(lens.set(this.get(), t)))
   }
@@ -210,7 +208,6 @@ export class Store<S> {
     return new Store(
       this.transact,
       this.listen,
-      this._disconnect,
       () => {
         const ret = {} as T
         keys.forEach(k => {
@@ -241,31 +238,6 @@ export class Store<S> {
     keep.forEach(k => identities[k] = this.at(k))
     return this.relabel({[k as string]: s, ...(identities as any)})
   }
-
-  /** Remove all listeners.
-
-      const store = Store.init(1)
-      let messages = 0
-      store.on(_ => messages++)
-      store.on(_ => messages++)
-      store.on(_ => messages++)
-      store.set(2)
-      messages // => 3
-      store.set(3)
-      messages // => 6
-      store.disconnect()
-      store.set(4)
-      messages // => 6
-      store.on(_ => messages++)
-      store.set(5)
-      messages // => 7
-
-  Used for hot module reloading.
-  */
-  disconnect(): void {
-    return this._disconnect()
-  }
-
 
   /** Set the value using an array method (purity is ensured because the spine is copied before running the function)
 
@@ -546,7 +518,7 @@ export interface Stack<S> {
 
 /** List with iteration and O(1) push and remove */
 function ListWithRemove<A>() {
-  let dict = {} as Record<string, A>
+  const dict = {} as Record<string, A>
   let order = [] as number[]
   let next_unique = 0
   let dirty = false
@@ -573,12 +545,6 @@ function ListWithRemove<A>() {
           f(dict[id])
         }
       })
-    },
-    /** Clear all elements */
-    clear(): void {
-      dict = {}
-      order = []
-      dirty = false
     }
   }
 }
