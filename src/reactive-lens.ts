@@ -224,6 +224,19 @@ export class Store<S> {
       })
   }
 
+  /** Make a substore which omits some keys
+
+    const store = Store.init({a: 1, b: 2, c: 3, d: 4})
+    const cd = store.omit('a', 'b')
+    cd.get() // => {c: 3, d: 4}
+    cd.set({c: 5, d: 6})
+    store.get() // {a: 1, b: 2, c: 5, d: 6}
+
+  */
+  omit<K extends keyof S>(...ks: K[]): Store<Omit<S, K>> {
+    return this.zoom(Lens.omit(...ks))
+  }
+
   /** Replace the substore at one field and keep the rest of the shape intact
 
       const store = Store.init({a: {x: 1, y: 2}, b: 3})
@@ -267,6 +280,7 @@ export class Store<S> {
   static each<A>(store: Store<A[]>): Store<A>[] {
     return store.get().map((_, i) => store.zoom(Lens.index(i)))
   }
+
 }
 
 /** A lens: allows you to operate on a subpart `T` of some data `S`
@@ -397,6 +411,17 @@ export module Lens {
       (s: S, u: U) => lens1.set(s, lens2.set(lens1.get(s), u))
     )
   }
+
+  /** Make a lens which omits some keys */
+  export function omit<S, K extends keyof S>(...ks: K[]): Lens<S, Omit<S, K>> {
+    const curry = (s: S) => {
+      const all_keys = Object.keys(s) as (keyof S)[]
+      const picked = all_keys.filter(x => -1 == ks.indexOf(x as K))
+      return (Lens.pick as any)(...picked)
+    }
+    return Lens.lens((s) => curry(s).get(s), (s, t) => curry(s).set(s, t))
+  }
+
 
   /** Partial lens to a particular index in an array
 
@@ -548,3 +573,8 @@ function ListWithRemove<A>() {
     }
   }
 }
+
+// From: http://ideasintosoftware.com/typescript-advanced-tricks/
+export type Diff<T extends string, U extends string> = ({[P in T]: P } & {[P in U]: never } & { [x: string]: never })[T]
+export type Omit<T, K extends keyof T> = {[P in Diff<keyof T, K>]: T[P]}
+

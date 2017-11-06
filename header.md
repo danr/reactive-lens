@@ -1,6 +1,6 @@
 # reactive-lens
 
-> A tiny library for pure, reactive and composable state.
+> A lightweight library for pure, reactive and composable state.
 
 ## Synopsis
 

@@ -1,6 +1,6 @@
 # reactive-lens
 
-> A tiny library for pure, reactive and composable state.
+> A lightweight library for pure, reactive and composable state.
 
 ## Synopsis
 
@@ -36,6 +36,7 @@ store.at('left').modify(decrement)
   * at
   * pick
   * relabel
+  * omit
   * along
   * arr
   * each
@@ -51,6 +52,7 @@ store.at('left').modify(decrement)
   * key
   * def
   * seq
+  * omit
   * index
 * module Undo
   * undo
@@ -65,6 +67,8 @@ store.at('left').modify(decrement)
 * interface Stack
   * top
   * pop
+* Diff
+* Omit
 ## Documentation
 ### class Store
 
@@ -89,7 +93,7 @@ Store laws with listeners:
 A store is a partially applied, existentially quantified lens with a change listener.
 * **init**: `<S>(s0: S) => Store<S>`
 
-  Make the root store (static method)
+  Make the root store (static method) 
 * **get**: `() => S`
 
   Get the current value (which must not be mutated)
@@ -110,7 +114,7 @@ A store is a partially applied, existentially quantified lens with a change list
   // => 2
   ```
 
-  Returns itself.
+  Returns itself. 
 * **update**: `<K extends keyof S>(parts: { [k in K]: S[K]; }) => Store<S>`
 
   Update some parts of the state, keep the rest constant
@@ -122,7 +126,7 @@ A store is a partially applied, existentially quantified lens with a change list
   // => {a: 3, b: 2}
   ```
 
-  Returns itself.
+  Returns itself. 
 * **modify**: `(f: (s: S) => S) => Store<S>`
 
   Modify the value in the store (must not use mutation: construct a new value)
@@ -134,7 +138,7 @@ A store is a partially applied, existentially quantified lens with a change list
   // => 2
   ```
 
-  Returns itself.
+  Returns itself. 
 * **on**: `(k: (s: S) => void) => () => void`
 
   React on changes. Returns an unsubscribe function.
@@ -159,9 +163,9 @@ A store is a partially applied, existentially quantified lens with a change list
   let last
   store.on(x => last = x)
   store.transaction(() => {
-    store.set(2)
-    assert.equal(last, undefined)
-    return 3
+  store.set(2)
+  assert.equal(last, undefined)
+  return 3
   })   // => 3
   last // => 2
   ```
@@ -189,7 +193,7 @@ A store is a partially applied, existentially quantified lens with a change list
   store.at('a').get() // => 3
   ```
 
-  Note: the key must always be present.
+  Note: the key must always be present. 
 * **pick**: `<Ks extends keyof S>(...ks: Array<Ks>) => Store<{ [K in Ks]: S[K]; }>`
 
   Make a substore by picking many keys
@@ -201,7 +205,7 @@ A store is a partially applied, existentially quantified lens with a change list
   store.get() // => {a: 5, b: 4, c: 3}
   ```
 
-  Note: the keys must always be present.
+  Note: the keys must always be present. 
 * **relabel**: `<T>(stores: { [K in keyof T]: Store<T[K]>; }) => Store<T>`
 
   Make a substore by relabelling
@@ -214,7 +218,18 @@ A store is a partially applied, existentially quantified lens with a change list
   store.get() // => {a: 5, b: 4, c: 3}
   ```
 
-  Note: must not use the same part of the store several times.
+  Note: must not use the same part of the store several times. 
+* **omit**: `<K extends keyof S>(...ks: Array<K>) => Store<Omit<S, K>>`
+
+  Make a substore which omits some keys
+
+  ```typescript
+  const store = Store.init({a: 1, b: 2, c: 3, d: 4})
+  const cd = store.omit('a', 'b')
+  cd.get() // => {c: 3, d: 4}
+  cd.set({c: 5, d: 6})
+  store.get() // {a: 1, b: 2, c: 5, d: 6}
+  ```
 * **along**: `<K extends keyof S, Ks extends keyof S, B>(k: K, s: Store<B>, ...keep: Array<Ks>) => Store<{ [k in K]: B; } & { [k in Ks]: S[k]; }>`
 
   Replace the substore at one field and keep the rest of the shape intact
@@ -227,7 +242,7 @@ A store is a partially applied, existentially quantified lens with a change list
   store.get() // => {a: {x: 1, y: 4}, b: 7}
   ```
 
-  Note: must not use the same part of the store several times.
+  Note: must not use the same part of the store several times. 
 * **arr**: `<A, K extends "length" | "toString" | "toLocaleString" | "push" | "pop" | "concat" | "join" | "reverse" | "shift" | "slice" | "sort" | "splice" | "unshift" | "indexOf" | "lastIndexOf" | "every" | "some" | "forEach" | "map" | "filter" | "reduce" | "reduceRight">(store: Store<Array<A>>, k: K) => Array<A>[K]`
 
   Set the value using an array method (purity is ensured because the spine is copied before running the function)
@@ -238,7 +253,7 @@ A store is a partially applied, existentially quantified lens with a change list
   store.get() // => [0, 9, 6, 3]
   ```
 
-  (static method)
+  (static method) 
 * **each**: `<A>(store: Store<Array<A>>) => Array<Store<A>>`
 
   Get partial stores for each position currently in the array
@@ -251,7 +266,7 @@ A store is a partially applied, existentially quantified lens with a change list
 
   (static method)
 
-  Note: exceptions are thrown when looking outside the array.
+  Note: exceptions are thrown when looking outside the array. 
 ### interface Lens
 
 A lens: allows you to operate on a subpart `T` of some data `S`
@@ -265,43 +280,43 @@ Lenses must conform to these three lens laws:
 `l.set(l.set(s, a), b) = l.set(s, b)`
 * **get**: `(s: S) => T`
 
-  Get the value via the lens
+  Get the value via the lens 
 * **set**: `(s: S, t: T) => S`
 
-  Set the value via the lens
+  Set the value via the lens 
 ### module Lens
 
-Common lens constructors and functions
+Common lens constructors and functions 
 * **lens**: `<S, T>(get: (s: S) => T, set: (s: S, t: T) => S) => Lens<S, T>`
 
   Make a lens from a getter and setter
 
-  Note: lenses are subject to the three lens laws
+  Note: lenses are subject to the three lens laws 
 * **relabel**: `<S, T>(lenses: { [K in keyof T]: Lens<S, T[K]>; }) => Lens<S, T>`
 
   Lens from a record of lenses
 
-  Note: must not use the same part of the store several times.
+  Note: must not use the same part of the store several times. 
 * **at**: `<S, K extends keyof S>(k: K) => Lens<S, S[K]>`
 
   Lens to a key in a record
 
-  Note: the key must always be present.
+  Note: the key must always be present. 
 * **iso**: `<S, T>(f: (s: S) => T, g: (t: T) => S) => Lens<S, T>`
 
   Make a lens from an isomorphism.
 
-  Note: requires that for all `s` and `t` we have `f(g(t)) = t` and `g(f(s)) = s`
+  Note: requires that for all `s` and `t` we have `f(g(t)) = t` and `g(f(s)) = s` 
 * **pick**: `<S, Ks extends keyof S>(...keys: Array<Ks>) => Lens<S, { [K in Ks]: S[K]; }>`
 
   Lens to a keys in a record
 
-  Note: the keys must always be present.
+  Note: the keys must always be present. 
 * **key**: `<S, K extends keyof S>(k: K) => Lens<S, S[K]>`
 
   Lens to a key in a record which may be missing
 
-  Note: setting the value to undefined removes the key from the record.
+  Note: setting the value to undefined removes the key from the record. 
 * **def**: `<A>(missing: A) => Lens<A, A>`
 
   Lens which refer to a default value instead of undefined
@@ -319,7 +334,10 @@ Common lens constructors and functions
   ```
 * **seq**: `<S, T, U>(lens1: Lens<S, T>, lens2: Lens<T, U>) => Lens<S, U>`
 
-  Compose two lenses sequentially
+  Compose two lenses sequentially 
+* **omit**: `<S, K extends keyof S>(...ks: Array<K>) => Lens<S, Omit<S, K>>`
+
+  Make a lens which omits some keys 
 * **index**: `<A>(i: number) => Lens<Array<A>, A>`
 
   Partial lens to a particular index in an array
@@ -332,7 +350,7 @@ Common lens constructors and functions
   store.get() // => [99, 1, 2, 3]
   ```
 
-  Note: an exception is thrown if you look outside the array.
+  Note: an exception is thrown if you look outside the array. 
 ### module Undo
 
 History zipper functions
@@ -361,25 +379,25 @@ now.get() // => {a: 1, b: 2}
 ```
 * **undo**: `<S>(h: Undo<S>) => Undo<S>`
 
-  Undo iff there is a past
+  Undo iff there is a past 
 * **redo**: `<S>(h: Undo<S>) => Undo<S>`
 
-  Redo iff there is a future
+  Redo iff there is a future 
 * **advance**: `<S>(h: Undo<S>) => Undo<S>`
 
-  Advances the history by copying the present state
+  Advances the history by copying the present state 
 * **init**: `<S>(now: S) => Undo<S>`
 
-  Initialise the history
+  Initialise the history 
 * **now**: `<S>() => Lens<Undo<S>, S>`
 
-  Lens to the present moment
+  Lens to the present moment 
 * **advance_to**: `<S>(s: S) => (h: Undo<S>) => Undo<S>`
 
-  Advances the history to some new state
+  Advances the history to some new state 
 ### interface Undo
 
-History zipper
+History zipper 
 * **tip**: `Stack<S>`
 
   
@@ -388,10 +406,16 @@ History zipper
   
 ### interface Stack
 
-A non-empty stack
+A non-empty stack 
 * **top**: `S`
 
   
 * **pop**: `Stack<S>`
+
+  
+* **Diff**: `undefined`
+
+  
+* **Omit**: `undefined`
 
   

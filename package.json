@@ -1,7 +1,7 @@
 {
   "name": "reactive-lens",
   "version": "0.1.0",
-  "description": "A tiny library for pure, reactive and composable state.",
+  "description": "A lightweight library for pure, reactive and composable state.",
   "author": "Dan Rosén",
   "license": "MIT",
   "main": "reactive-lens.js",
