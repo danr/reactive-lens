@@ -16,7 +16,7 @@
     "typescript": "^2.4.2"
   },
   "scripts": {
-    "pretest": "tsc test/*.ts",
+    "pretest": "typescript-doctest src/*.ts -o test/reactive-lens.doctest.ts -i 'import { Store, Lens } from \"../src/reactive-lens\"' && tsc test/*.ts",
     "test": "tape test/*js | tap-diff",
     "precoverage": "tsc test/*.ts",
     "coverage": "covert test/*js",
