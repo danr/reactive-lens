@@ -281,6 +281,73 @@ export class Store<S> {
     return store.get().map((_, i) => store.via(Lens.index(i)))
   }
 
+  /** Connect with local storage */
+  storage_connect(
+      key: string = 'state',
+      audit: (s: S) => boolean = () => true,
+      api: {
+        get: (key: string) => string | null,
+        set: (key: string, data: string) => void
+      } = {
+        get: window.localStorage.getItem,
+        set: window.localStorage.setItem
+      }
+    ): () => void
+  {
+    const stored = api.get(key)
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored)
+        if (audit(parsed)) {
+          this.set(parsed)
+        }
+      } catch (_) {
+        // pass
+      }
+    }
+    return this.on(s => api.set(key, JSON.stringify(s)))
+  }
+
+  /** Connect with window.location.hash */
+  location_connect(
+      to_hash: (state: S) => string,
+      from_hash: (hash: string) => S | undefined,
+      api: {
+        get(): string,
+        set(hash: string): void,
+        on(cb: () => void): void
+      } = {
+        get() { return window.location.hash },
+        set(s) { window.location.hash = s },
+        on(cb) { window.onhashchange = cb }
+      }
+    ): () => void
+  {
+    let self = false
+    function update() {
+      if (!self) {
+        const updated = from_hash(api.get())
+        if (updated !== undefined) {
+          this.set(updated)
+        } else {
+          // gibberish, just revert it to what is now
+          self = true
+          api.set(to_hash(this.get()))
+        }
+      } else {
+        self = false
+      }
+    }
+    api.on(update)
+    update()
+    return this.on(x => {
+      const hash = to_hash(x)
+      if (hash != api.get()) {
+        self = true // we don't need to react on this
+        api.set(hash)
+      }
+    })
+  }
 }
 
 /** A lens: allows you to operate on a subpart `T` of some data `S`
@@ -577,4 +644,5 @@ function ListWithRemove<A>() {
 // From: http://ideasintosoftware.com/typescript-advanced-tricks/
 export type Diff<T extends string, U extends string> = ({[P in T]: P } & {[P in U]: never } & { [x: string]: never })[T]
 export type Omit<T, K extends keyof T> = {[P in Diff<keyof T, K>]: T[P]}
+
 

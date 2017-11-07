@@ -57,6 +57,8 @@ body.appendChild(Input(store.at('right')))
   * along
   * arr
   * each
+  * storage_connect
+  * location_connect
 * interface Lens
   * get
   * set
@@ -284,6 +286,12 @@ A store is a partially applied, existentially quantified lens with a change list
   (static method)
 
   Note: exceptions are thrown when looking outside the array. 
+* **storage_connect**: `(key?: string, audit?: (s: S) => boolean, api?: { get: (key: string) => string; set: (key: string, data: string) => void; }) => () => void`
+
+  Connect with local storage 
+* **location_connect**: `(to_hash: (state: S) => string, from_hash: (hash: string) => S, api?: { get(): string; set(hash: string): void; on(cb: () => void): void; }) => () => void`
+
+  Connect with window.location.hash 
 ### interface Lens
 
 A lens: allows you to operate on a subpart `T` of some data `S`
