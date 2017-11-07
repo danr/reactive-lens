@@ -21,7 +21,24 @@ store.at('right').modify(increment)
 store.at('left').modify(decrement)
 ```
 
+Hooking it up with the DOM:
 
+```typescript
+import { Store } from 'reactive-lens'
+
+const store = Store.init({left: '', right: ''})
+
+function Input(store: Store<string>) {
+  const input = document.createElement('input')
+  input.value = store.get()
+  store.on(x => input.value = x)
+  input.addEventListener('input', function () { store.set(this.value) })
+}
+
+const body = document.getElementsByTagName('body')[0]
+body.appendChild(Input(store.at('left')))
+body.appendChild(Input(store.at('right')))
+```
 
 ## API overview
 * class Store
