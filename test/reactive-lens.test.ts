@@ -69,20 +69,20 @@ test('reactive-lens', assert => {
   Store.each(r_bs)[1].set(882)
   after('each set', {a: 10, b: [2, 882], c: {d: [3, 4], e: 20}})
 
-  r_bs.zoom(L.index(0)).modify(x => x + 1)
+  r_bs.via(L.index(0)).modify(x => x + 1)
   after('index modify', {a: 10, b: [3, 882], c: {d: [3, 4], e: 20}})
   test_laws(r_bs, [9,8], [6,9,8])
-  test_laws(r_bs.zoom(L.index(1)), 10, 20)
+  test_laws(r_bs.via(L.index(1)), 10, 20)
 
   r_bs.modify(xs => xs.map(x => x + 1))
   store.at('c').at('d').modify(xs => xs.map(x => x + 1))
   after('mapping', {a: 10, b: [4, 883], c: {d: [4, 5], e: 20}}, 2)
 
-  const r_bsr = r_bs.zoom(L.iso(reverse, reverse))
-  r_bsr.zoom(L.index(0)).set(42)
+  const r_bsr = r_bs.via(L.iso(reverse, reverse))
+  r_bsr.via(L.index(0)).set(42)
   after('iso reverse', {a: 10, b: [4, 42], c: {d: [4, 5], e: 20}})
   test_laws(r_bsr, [9,8], [6,9,8])
-  test_laws(r_bsr.zoom(L.index(1)), 10, 20)
+  test_laws(r_bsr.via(L.index(1)), 10, 20)
 
   let a: any
   const unsubscribe = r_a.on(v => a = v)
@@ -103,18 +103,18 @@ test('reactive-lens', assert => {
 
 test('index', assert => {
   const {store, after} = init([0,1,2,10], assert)
-  store.zoom(L.index(3)).set(3)
+  store.via(L.index(3)).set(3)
   after('inserting 3', [0,1,2,3])
   assert.end()
 })
 
 test('index out of bounds', assert => {
   const {store} = init([0,1,2], assert)
-  const r4 = store.zoom(L.index(4))
+  const r4 = store.via(L.index(4))
   assert.throws(() => {
     r4.set(4)
   })
-  const rn = store.zoom(L.index(-1))
+  const rn = store.via(L.index(-1))
   assert.throws(() => {
     rn.set(4)
   })
@@ -123,9 +123,9 @@ test('index out of bounds', assert => {
 
 test('key', assert => {
   const {store, after, test_laws} = init({apa: 1, bepa: 2} as Record<string, number>, assert)
-  const apa = store.zoom(L.key('apa'))
-  const bepa = store.zoom(L.key('bepa'))
-  const cepa = store.zoom(L.key('cepa'))
+  const apa = store.via(L.key('apa'))
+  const bepa = store.via(L.key('bepa'))
+  const cepa = store.via(L.key('cepa'))
   apa.set(3)
   after('setting apa', {apa: 3, bepa: 2})
   test_laws(apa, 9, 8)
@@ -134,14 +134,14 @@ test('key', assert => {
   test_laws(apa, 9, 8)
   test_laws(apa, undefined, 8)
   test_laws(apa, 8, undefined)
-  const b0 = bepa.zoom(L.def(0))
+  const b0 = bepa.via(L.def(0))
   b0.set(0)
-  after('removing bepa zoom def', {})
+  after('removing bepa via def', {})
   test_laws(b0, 9, 8)
   test_laws(b0, 0, 8)
   test_laws(b0, 8, 0)
-  cepa.zoom(L.def(0)).set(3)
-  after('inserting cepa zoom def', {cepa: 3})
+  cepa.via(L.def(0)).set(3)
+  after('inserting cepa via def', {cepa: 3})
   assert.is(cepa.get(), 3, 'get')
   assert.is(apa.get(), undefined, 'get missing')
   assert.end()
@@ -162,9 +162,9 @@ test('along', assert => {
   after('along', {k: {a: 10, b: 2}, g: 30})
   test_laws(kag, {k: 9, g: 8}, {k: 7, g: 6})
   /*
-  const kbg = store.zoom(L.along<typeof s0>()('k', L.at<typeof s0.k, 'b'>('b'), 'g'))
+  const kbg = store.via(L.along<typeof s0>()('k', L.at<typeof s0.k, 'b'>('b'), 'g'))
   kbg.set({k: 20, g: 40})
-  after('zoom along', {k: {a: 10, b: 20}, g: 40})
+  after('via along', {k: {a: 10, b: 20}, g: 40})
   */
   test_laws(kag, {k: 9, g: 8}, {k: 7, g: 6})
   assert.end()
@@ -183,7 +183,7 @@ test('along along', assert => {
 test('relabel', assert => {
   const s0 = {k: 1, g: 2}
   const {store, after, test_laws} = init(s0, assert)
-  const ab = store.zoom(L.relabel({a: L.at<typeof s0, 'g'>('g'), b: L.at<typeof s0, 'k'>('k')}))
+  const ab = store.via(L.relabel({a: L.at<typeof s0, 'g'>('g'), b: L.at<typeof s0, 'k'>('k')}))
   ab.set({a: 4, b: 3})
   after('relabel', {k: 3, g: 4})
   test_laws(ab, {a: 9, b: 8}, {a: 6, b: 5})
@@ -197,7 +197,7 @@ test('pick', assert => {
   kg.set({k: 4, g: 5})
   after('pick', {k: 4, g: 5, h: 3})
   test_laws(kg, {k: 9, g: 8}, {k: 6, g: 5})
-  const gh = store.zoom(L.pick('g', 'h'))
+  const gh = store.via(L.pick('g', 'h'))
   gh.set({g: 6, h: 7})
   after('pick', {k: 4, g: 6, h: 7})
   test_laws(gh, {g: 8, h: 9}, {g: 5, h: 6})
@@ -223,13 +223,13 @@ test('seq', assert => {
   const {store, after, test_laws} = init(1, assert)
   const double = L.iso((x: number) => x * 2, x => x / 2)
   const bump = L.iso((x: number) => x + 1, x => x - 1)
-  const db = store.zoom(L.seq(double, bump))
+  const db = store.via(L.seq(double, bump))
   assert.equals(db.get(), 3)
   db.modify(x => x + 2)
   assert.equals(db.get(), 5)
   after('db modify', 2)
   test_laws(db, 8, 9)
-  const bd = store.zoom(L.seq(bump, double))
+  const bd = store.via(L.seq(bump, double))
   assert.equals(bd.get(), 6)
   bd.modify(x => x + 2)
   after('bd modify', 3)

@@ -32,7 +32,7 @@ store.at('left').modify(decrement)
   * modify
   * on
   * transaction
-  * zoom
+  * via
   * at
   * pick
   * relabel
@@ -169,13 +169,13 @@ A store is a partially applied, existentially quantified lens with a change list
   })   // => 3
   last // => 2
   ```
-* **zoom**: `<T>(lens: Lens<S, T>) => Store<T>`
+* **via**: `<T>(lens: Lens<S, T>) => Store<T>`
 
   Zoom in on a subpart of the store via a lens
 
   ```typescript
   const store = Store.init({a: 1, b: 2} as Record<string, number>)
-  const a_store = store.zoom(Lens.key('a'))
+  const a_store = store.via(Lens.key('a'))
   a_store.set(3)
   store.get() // => {a: 3, b: 2}
   a_store.get() // => 3
@@ -323,7 +323,7 @@ Common lens constructors and functions
 
   ```typescript
   const store = Store.init({a: 1, b: 2} as Record<string, number>)
-  const a_store = store.zoom(Lens.key('a')).zoom(Lens.def(0))
+  const a_store = store.via(Lens.key('a')).via(Lens.def(0))
   a_store.set(3)
   store.get() // => {a: 3, b: 2}
   a_store.get() // => 3
@@ -344,7 +344,7 @@ Common lens constructors and functions
 
   ```typescript
   const store = Store.init([0, 1, 2, 3])
-  const first = store.zoom(Lens.index(0))
+  const first = store.via(Lens.index(0))
   first.get() // => 0
   first.set(99)
   store.get() // => [99, 1, 2, 3]
@@ -359,7 +359,7 @@ History zipper functions
 const {undo, redo, advance, advance_to} = Undo
 const store = Store.init(Undo.init({a: 1, b: 2}))
 const modify = op => store.modify(op)
-const now = store.zoom(Undo.now())
+const now = store.via(Undo.now())
 now.get() // => {a: 1, b: 2}
 modify(advance_to({a: 3, b: 4}))
 now.get() // => {a: 3, b: 4}

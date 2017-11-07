@@ -154,7 +154,7 @@ export class Store<S> {
   /** Zoom in on a subpart of the store via a lens
 
       const store = Store.init({a: 1, b: 2} as Record<string, number>)
-      const a_store = store.zoom(Lens.key('a'))
+      const a_store = store.via(Lens.key('a'))
       a_store.set(3)
       store.get() // => {a: 3, b: 2}
       a_store.get() // => 3
@@ -162,7 +162,7 @@ export class Store<S> {
       store.get() // => {b: 2}
 
   */
-  zoom<T>(lens: Lens<S, T>) {
+  via<T>(lens: Lens<S, T>) {
     return new Store(
       this.transact,
       this.listen,
@@ -179,7 +179,7 @@ export class Store<S> {
 
   Note: the key must always be present. */
   at<K extends keyof S>(k: K): Store<S[K]> {
-    return this.zoom(Lens.at(k))
+    return this.via(Lens.at(k))
   }
 
   /** Make a substore by picking many keys
@@ -191,7 +191,7 @@ export class Store<S> {
 
   Note: the keys must always be present. */
   pick<Ks extends keyof S>(...ks: Ks[]): Store<{[K in Ks]: S[K]}> {
-    return this.zoom(Lens.pick(...ks))
+    return this.via(Lens.pick(...ks))
   }
 
   /** Make a substore by relabelling
@@ -234,7 +234,7 @@ export class Store<S> {
 
   */
   omit<K extends keyof S>(...ks: K[]): Store<Omit<S, K>> {
-    return this.zoom(Lens.omit(...ks))
+    return this.via(Lens.omit(...ks))
   }
 
   /** Replace the substore at one field and keep the rest of the shape intact
@@ -278,7 +278,7 @@ export class Store<S> {
 
   Note: exceptions are thrown when looking outside the array. */
   static each<A>(store: Store<A[]>): Store<A>[] {
-    return store.get().map((_, i) => store.zoom(Lens.index(i)))
+    return store.get().map((_, i) => store.via(Lens.index(i)))
   }
 
 }
@@ -388,7 +388,7 @@ export module Lens {
   /** Lens which refer to a default value instead of undefined
 
       const store = Store.init({a: 1, b: 2} as Record<string, number>)
-      const a_store = store.zoom(Lens.key('a')).zoom(Lens.def(0))
+      const a_store = store.via(Lens.key('a')).via(Lens.def(0))
       a_store.set(3)
       store.get() // => {a: 3, b: 2}
       a_store.get() // => 3
@@ -426,7 +426,7 @@ export module Lens {
   /** Partial lens to a particular index in an array
 
       const store = Store.init([0, 1, 2, 3])
-      const first = store.zoom(Lens.index(0))
+      const first = store.via(Lens.index(0))
       first.get() // => 0
       first.set(99)
       store.get() // => [99, 1, 2, 3]
@@ -454,7 +454,7 @@ export module Lens {
     const {undo, redo, advance, advance_to} = Undo
     const store = Store.init(Undo.init({a: 1, b: 2}))
     const modify = op => store.modify(op)
-    const now = store.zoom(Undo.now())
+    const now = store.via(Undo.now())
     now.get() // => {a: 1, b: 2}
     modify(advance_to({a: 3, b: 4}))
     now.get() // => {a: 3, b: 4}
