@@ -365,6 +365,16 @@ Common lens constructors and functions
 
   Make a lens from an isomorphism.
 
+  ```typescript
+  const store = Store.init(5)
+  const doubled = store.via(Lens.iso(x => 2 * x, x => x / 2))
+  doubled.get() // => 10
+  doubled.set(50)
+  store.get() // => 25
+  doubled.modify(x => x * 2).get() // => 100
+  store.get() // => 50
+  ```
+
   Note: requires that for all `s` and `t` we have `f(g(t)) = t` and `g(f(s)) = s` 
 * **pick**: `<S, Ks extends keyof S>(...keys: Array<Ks>) => Lens<S, { [K in Ks]: S[K]; }>`
 
