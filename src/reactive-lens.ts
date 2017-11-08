@@ -232,51 +232,6 @@ export class Store<S> {
     return this.via(Lens.pick(...ks))
   }
 
-  /** Make a substore by relabelling
-
-      const store = Store.init({a: 1, b: 2, c: 3})
-      const other = store.relabel({x: store.at('a'), y: store.at('b')})
-      other.get() // => {x: 1, y: 2}
-      other.set({x: 5, y: 4})
-      store.get() // => {a: 5, b: 4, c: 3}
-
-  Note: must not use the same part of the store several times. */
-  relabel<T>(stores: {[K in keyof T]: Store<T[K]>}): Store<T> {
-    return this.pick().extend(stores)
-  }
-
-  /** Extend a store with new substores
-
-      const store = Store.init({a: 1, b: 2, c: 3})
-      const small = store.pick('a')
-      const other = small.extend({y: store.at('b'), z: store.at('c')})
-      other.get() // => {a: 1, y: 2, z: 3}
-      other.set({a: 1, y: 4, z: 5})
-      store.get() // => {a: 1, b: 4, c: 5}
-
-  Note: must not use the same part of the store several times. */
-  extend<T>(stores: {[K in keyof T]: Store<T[K]>}): Store<S & T> {
-    const keys = Object.keys(stores) as (keyof T)[]
-    return new Store(
-      this.transact,
-      this.listen,
-      () => {
-        const ret = {...(this.get() as any)} as any
-        keys.forEach(k => {
-          ret[k] = stores[k].get()
-        })
-        return ret
-      },
-      (t: T) => {
-        this.transact(() => {
-          keys.forEach(k => {
-            stores[k].set(t[k])
-          })
-        })
-      })
-
-  }
-
   /** Make a substore which omits some keys
 
     const store = Store.init({a: 1, b: 2, c: 3, d: 4})
@@ -290,19 +245,67 @@ export class Store<S> {
     return this.via(Lens.omit(...ks))
   }
 
-  /** Replace the substore at one field and keep the rest of the shape intact
+  /** Make a substore by relabelling
 
-      const store = Store.init({a: {x: 1, y: 2}, b: 3})
-      const other = store.along('a', store.at('a').at('y'), 'b')
-      other.get() // => {a: 2, b: 3}
-      other.set({a: 4, b: 7})
-      store.get() // => {a: {x: 1, y: 4}, b: 7}
+      const store = Store.init({a: 1, b: 2, c: 3})
+      const other = store.relabel({x: store.at('a'), y: store.at('b')})
+      other.get() // => {x: 1, y: 2}
+      other.set({x: 5, y: 4})
+      store.get() // => {a: 5, b: 4, c: 3}
 
   Note: must not use the same part of the store several times. */
-  along<K extends keyof S, Ks extends keyof S, B>(k: K, s: Store<B>, ...keep: Ks[]): Store<{[k in K]: B} & {[k in Ks]: S[k]}> {
-    const identities = {} as {[k in Ks]: Store<S[k]>}
-    keep.forEach(k => identities[k] = this.at(k))
-    return this.relabel({[k as string]: s, ...(identities as any)})
+  relabel<T>(stores: {[K in keyof T]: Store<T[K]>}): Store<T> {
+    const keys = Object.keys(stores) as (keyof T)[]
+    return new Store(
+      this.transact,
+      this.listen,
+      () => {
+        const ret = {} as T
+        keys.forEach(k => {
+          ret[k] = stores[k].get()
+        })
+        return ret
+      },
+      (t: T) => {
+        this.transact(() => {
+          keys.forEach(k => {
+            stores[k].set(t[k])
+          })
+        })
+      })
+  }
+
+  /** Merge two stores
+
+      const store = Store.init({a: 1, b: 2, c: 3})
+      const small = store.pick('a')
+      const other = small.merge(store.relabel({z: store.at('c')}))
+      other.get() // => {a: 1, z: 3}
+      other.set({a: 0, z: 4})
+      store.get() // => {a: 0, b: 2, c: 4}
+
+  Note: the two stores must originate from the same root.
+  Note: this store and the other store must both be objects.
+  Note: must not use the same part of the store several times. */
+  merge<T>(other: Store<T>): Store<S & T> {
+    const other_keys = {} as {[K in keyof T]: true}
+    Object.keys(other.get()).forEach((k: keyof T) => other_keys[k] = true)
+    return new Store(
+      this.transact,
+      this.listen,
+      () => ({...this.get() as any, ...other.get() as any}),
+      (t: S & T) => {
+        this.transact(() => {
+          Object.keys(t).forEach(k => {
+            if (k in other_keys) {
+              other.at(k as keyof T).set((t as any)[k])
+            } else {
+              this.at(k as keyof S).set((t as any)[k])
+            }
+          })
+        })
+      })
+
   }
 
   /** Set the value using an array method (purity is ensured because the spine is copied before running the function)

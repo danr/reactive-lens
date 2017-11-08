@@ -53,10 +53,9 @@ body.appendChild(Input(store.at('right')))
   * via
   * at
   * pick
-  * relabel
-  * extend
   * omit
-  * along
+  * relabel
+  * merge
   * arr
   * each
   * storage_connect
@@ -257,6 +256,17 @@ A store is a partially applied, existentially quantified lens with a change list
   ```
 
   Note: the keys must always be present. 
+* **omit**: `<K extends keyof S>(...ks: Array<K>) => Store<Omit<S, K>>`
+
+  Make a substore which omits some keys
+
+  ```typescript
+  const store = Store.init({a: 1, b: 2, c: 3, d: 4})
+  const cd = store.omit('a', 'b')
+  cd.get() // => {c: 3, d: 4}
+  cd.set({c: 5, d: 6})
+  store.get() // {a: 1, b: 2, c: 5, d: 6}
+  ```
 * **relabel**: `<T>(stores: { [K in keyof T]: Store<T[K]>; }) => Store<T>`
 
   Make a substore by relabelling
@@ -270,43 +280,21 @@ A store is a partially applied, existentially quantified lens with a change list
   ```
 
   Note: must not use the same part of the store several times. 
-* **extend**: `<T>(stores: { [K in keyof T]: Store<T[K]>; }) => Store<S & T>`
+* **merge**: `<T>(other: Store<T>) => Store<S & T>`
 
-  Extend a store with new substores
+  Merge two stores
 
   ```typescript
   const store = Store.init({a: 1, b: 2, c: 3})
   const small = store.pick('a')
-  const other = small.extend({y: store.at('b'), z: store.at('c')})
-  other.get() // => {a: 1, y: 2, z: 3}
-  other.set({a: 1, y: 4, z: 5})
-  store.get() // => {a: 1, b: 4, c: 5}
+  const other = small.merge(store.relabel({z: store.at('c')}))
+  other.get() // => {a: 1, z: 3}
+  other.set({a: 0, z: 4})
+  store.get() // => {a: 0, b: 2, c: 4}
   ```
 
-  Note: must not use the same part of the store several times. 
-* **omit**: `<K extends keyof S>(...ks: Array<K>) => Store<Omit<S, K>>`
-
-  Make a substore which omits some keys
-
-  ```typescript
-  const store = Store.init({a: 1, b: 2, c: 3, d: 4})
-  const cd = store.omit('a', 'b')
-  cd.get() // => {c: 3, d: 4}
-  cd.set({c: 5, d: 6})
-  store.get() // {a: 1, b: 2, c: 5, d: 6}
-  ```
-* **along**: `<K extends keyof S, Ks extends keyof S, B>(k: K, s: Store<B>, ...keep: Array<Ks>) => Store<{ [k in K]: B; } & { [k in Ks]: S[k]; }>`
-
-  Replace the substore at one field and keep the rest of the shape intact
-
-  ```typescript
-  const store = Store.init({a: {x: 1, y: 2}, b: 3})
-  const other = store.along('a', store.at('a').at('y'), 'b')
-  other.get() // => {a: 2, b: 3}
-  other.set({a: 4, b: 7})
-  store.get() // => {a: {x: 1, y: 4}, b: 7}
-  ```
-
+  Note: the two stores must originate from the same root.
+  Note: this store and the other store must both be objects.
   Note: must not use the same part of the store several times. 
 * **arr**: `<A, K extends "length" | "toString" | "toLocaleString" | "push" | "pop" | "concat" | "join" | "reverse" | "shift" | "slice" | "sort" | "splice" | "unshift" | "indexOf" | "lastIndexOf" | "every" | "some" | "forEach" | "map" | "filter" | "reduce" | "reduceRight">(store: Store<Array<A>>, k: K) => Array<A>[K]`
 
