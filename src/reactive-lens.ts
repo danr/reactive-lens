@@ -345,8 +345,8 @@ export class Store<S> {
         get: (key: string) => string | null,
         set: (key: string, data: string) => void
       } = {
-        get: window.localStorage.getItem,
-        set: window.localStorage.setItem
+        get: window.localStorage.getItem.bind(window.localStorage),
+        set: window.localStorage.setItem.bind(window.localStorage)
       }
     ): () => void
   {
@@ -394,8 +394,8 @@ export class Store<S> {
         self = false
       }
     }
-    api.on(update)
-    update()
+    api.on(update.bind(this))
+    update.apply(this)
     return this.on(x => {
       const hash = to_hash(x)
       if (hash != api.get()) {
