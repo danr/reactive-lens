@@ -48,6 +48,7 @@ body.appendChild(Input(store.at('right')))
   * update
   * modify
   * on
+  * ondiff
   * transaction
   * via
   * at
@@ -160,7 +161,7 @@ A store is a partially applied, existentially quantified lens with a change list
   Returns itself. 
 * **on**: `(k: (s: S) => void) => () => void`
 
-  React on changes. Returns an unsubscribe function.
+  React on changes. Returns the unsubscribe function.
 
   ```typescript
   const store = Store.init(1)
@@ -172,6 +173,36 @@ A store is a partially applied, existentially quantified lens with a change list
   store.set(3)
   last // => 2
   ```
+* **ondiff**: `(k: (new_value: S, old_value: S) => void) => () => void`
+
+  React on a difference in value. Returns the unsubscribe function.
+
+  ```typescript
+  const store = Store.init({a: 0})
+  let diffs = 0
+  const off = store.ondiff((new_value, old) => {
+    assert.notEqual(new_value, old)
+    diffs++
+  })
+  diffs // => 0
+  const object = {a: 1}
+  store.set(object)            // diff: new object
+  diffs                        // => 1
+  store.set(object)            // no diff: same object
+  diffs                        // => 1
+  store.set({a: 2})            // diff: new object
+  diffs                        // => 2
+  store.set({a: 2})            // diff: this is yet another new literal object
+  diffs                        // => 3
+  store.set(store.get())       // no diff: same object
+  diffs                        // => 3
+  store.modify(x => x)         // no diff: same object
+  diffs                        // => 3
+  store.at('a').modify(x => x) // diff: at does not see if the value actually changed
+  diffs                        // => 4
+  ```
+
+  Note: keeps a reference to the last value in memory. 
 * **transaction**: `<A>(m: () => A) => A`
 
   Start a new transaction: listeners are only invoked when the

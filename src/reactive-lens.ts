@@ -113,7 +113,7 @@ export class Store<S> {
     return this
   }
 
-  /** React on changes. Returns an unsubscribe function.
+  /** React on changes. Returns the unsubscribe function.
 
       const store = Store.init(1)
       let last
@@ -128,6 +128,43 @@ export class Store<S> {
   on(k: (s: S) => void): () => void {
     return this.listen(() => k(this.get()))
   }
+
+  /** React on a difference in value. Returns the unsubscribe function.
+
+        const store = Store.init({a: 0})
+        let diffs = 0
+        const off = store.ondiff((new_value, old) => {
+          assert.notEqual(new_value, old)
+          diffs++
+        })
+        diffs // => 0
+        const object = {a: 1}
+        store.set(object)            // diff: new object
+        diffs                        // => 1
+        store.set(object)            // no diff: same object
+        diffs                        // => 1
+        store.set({a: 2})            // diff: new object
+        diffs                        // => 2
+        store.set({a: 2})            // diff: this is yet another new literal object
+        diffs                        // => 3
+        store.set(store.get())       // no diff: same object
+        diffs                        // => 3
+        store.modify(x => x)         // no diff: same object
+        diffs                        // => 3
+        store.at('a').modify(x => x) // diff: at does not see if the value actually changed
+        diffs                        // => 4
+
+  Note: keeps a reference to the last value in memory. */
+  ondiff(k: (new_value: S, old_value: S) => void): () => void {
+    let old_value = this.get()
+    return this.on(new_value => {
+      if (new_value !== old_value) {
+        k(new_value, old_value)
+        old_value = new_value
+      }
+    })
+  }
+
 
   /** Start a new transaction: listeners are only invoked when the
   (top-level) transaction finishes, and not on set (and modify) inside the transaction.
@@ -168,6 +205,7 @@ export class Store<S> {
       this.listen,
       () => lens.get(this.get()),
       (t: T) => this.set(lens.set(this.get(), t)))
+      // possible "optimization": only set if t /= lens.get()
   }
 
   /** Make a substore at a key
