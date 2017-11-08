@@ -242,12 +242,26 @@ export class Store<S> {
 
   Note: must not use the same part of the store several times. */
   relabel<T>(stores: {[K in keyof T]: Store<T[K]>}): Store<T> {
+    return this.pick().extend(stores)
+  }
+
+  /** Extend a store with new substores
+
+      const store = Store.init({a: 1, b: 2, c: 3})
+      const small = store.pick('a')
+      const other = small.extend({y: store.at('b'), z: store.at('c')})
+      other.get() // => {a: 1, y: 2, z: 3}
+      other.set({a: 1, y: 4, z: 5})
+      store.get() // => {a: 1, b: 4, c: 5}
+
+  Note: must not use the same part of the store several times. */
+  extend<T>(stores: {[K in keyof T]: Store<T[K]>}): Store<S & T> {
     const keys = Object.keys(stores) as (keyof T)[]
     return new Store(
       this.transact,
       this.listen,
       () => {
-        const ret = {} as T
+        const ret = {...(this.get() as any)} as any
         keys.forEach(k => {
           ret[k] = stores[k].get()
         })
@@ -260,6 +274,7 @@ export class Store<S> {
           })
         })
       })
+
   }
 
   /** Make a substore which omits some keys

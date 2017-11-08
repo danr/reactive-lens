@@ -54,6 +54,7 @@ body.appendChild(Input(store.at('right')))
   * at
   * pick
   * relabel
+  * extend
   * omit
   * along
   * arr
@@ -266,6 +267,20 @@ A store is a partially applied, existentially quantified lens with a change list
   other.get() // => {x: 1, y: 2}
   other.set({x: 5, y: 4})
   store.get() // => {a: 5, b: 4, c: 3}
+  ```
+
+  Note: must not use the same part of the store several times. 
+* **extend**: `<T>(stores: { [K in keyof T]: Store<T[K]>; }) => Store<S & T>`
+
+  Extend a store with new substores
+
+  ```typescript
+  const store = Store.init({a: 1, b: 2, c: 3})
+  const small = store.pick('a')
+  const other = small.extend({y: store.at('b'), z: store.at('c')})
+  other.get() // => {a: 1, y: 2, z: 3}
+  other.set({a: 1, y: 4, z: 5})
+  store.get() // => {a: 1, b: 4, c: 5}
   ```
 
   Note: must not use the same part of the store several times. 
