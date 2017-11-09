@@ -310,9 +310,9 @@ export class Store<S> {
 
   /** Set the value using an array method (purity is ensured because the spine is copied before running the function)
 
-      const store = Store.init([0, 1, 2, 3])
-      Store.arr(store, 'splice')(1, 2, 9, 6) // => [1, 2]
-      store.get() // => [0, 9, 6, 3]
+      const store = Store.init(['a', 'b', 'c', 'd'])
+      Store.arr(store, 'splice')(1, 2, 'x', 'y', 'z') // => ['b', 'c']
+      store.get() // => ['a', 'x', 'y', 'z', 'd']
 
   (static method) */
   static arr<A, K extends keyof Array<A>>(store: Store<Array<A>>, k: K): Array<A>[K] {
@@ -326,9 +326,9 @@ export class Store<S> {
 
   /** Get partial stores for each position currently in the array
 
-      const store = Store.init([0, 1, 2, 3])
-      Store.each(store).map((substore, i) => substore.modify(x => x + i))
-      store.get() // => [0, 2, 4, 6]
+      const store = Store.init(['a', 'b', 'c'])
+      Store.each(store).map((substore, i) => substore.modify(s => s + i.toString()))
+      store.get() // => ['a0', 'b1', 'c2']
 
   (static method)
 
@@ -585,7 +585,7 @@ export module Lens {
     const {undo, redo, advance, advance_to} = Undo
     const store = Store.init(Undo.init({a: 1, b: 2}))
     const modify = op => store.modify(op)
-    const now = store.via(Undo.now())
+    const now = store.at('now')
     now.get() // => {a: 1, b: 2}
     modify(advance_to({a: 3, b: 4}))
     now.get() // => {a: 3, b: 4}
@@ -607,10 +607,11 @@ export module Lens {
 export module Undo {
   /** Undo iff there is a past */
   export function undo<S>(h: Undo<S>): Undo<S> {
-    if (h.tip.pop != null) {
+    if (h.prev != null) {
       return {
-        tip: h.tip.pop,
-        next: {top: h.tip.top, pop: h.next}
+        now: h.prev.top,
+        prev: h.prev.pop,
+        next: {top: h.now, pop: h.next}
       }
     } else {
       return h
@@ -621,7 +622,8 @@ export module Undo {
   export function redo<S>(h: Undo<S>): Undo<S> {
     if (h.next != null) {
       return {
-        tip: {top: h.next.top, pop: h.tip},
+        now: h.next.top,
+        prev: {top: h.now, pop: h.prev},
         next: h.next.pop
       }
     } else {
@@ -632,7 +634,8 @@ export module Undo {
   /** Advances the history by copying the present state */
   export function advance<S>(h: Undo<S>): Undo<S> {
     return {
-      tip: {top: h.tip.top, pop: h.tip},
+      now: h.now,
+      prev: {top: h.now, pop: h.prev},
       next: null
     }
   }
@@ -640,29 +643,23 @@ export module Undo {
   /** Initialise the history */
   export function init<S>(now: S): Undo<S> {
     return {
-      tip: {top: now, pop: null},
+      now,
+      prev: null,
       next: null
     }
   }
 
-  /** Lens to the present moment */
-  export function now<S>(): Lens<Undo<S>, S> {
-    return Lens.lens(
-      h => h.tip.top,
-      (h, v) => ({tip: {top: v, pop: h.tip.pop}, next: h.next})
-    )
-  }
-
   /** Advances the history to some new state */
   export function advance_to<S>(s: S): (h: Undo<S>) => Undo<S> {
-    return h => now<S>().set(advance(h), s)
+    return h => Lens.at<typeof h, 'now'>('now').set(advance(h), s)
   }
 
 }
 
 /** History zipper */
 export interface Undo<S> {
-  readonly tip: Stack<S>,
+  readonly now: S
+  readonly prev: null | Stack<S>,
   readonly next: null | Stack<S>,
 }
 

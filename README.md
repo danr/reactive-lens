@@ -79,10 +79,10 @@ body.appendChild(Input(store.at('right')))
   * redo
   * advance
   * init
-  * now
   * advance_to
 * interface Undo
-  * tip
+  * now
+  * prev
   * next
 * interface Stack
   * top
@@ -301,9 +301,9 @@ A store is a partially applied, existentially quantified lens with a change list
   Set the value using an array method (purity is ensured because the spine is copied before running the function)
 
   ```typescript
-  const store = Store.init([0, 1, 2, 3])
-  Store.arr(store, 'splice')(1, 2, 9, 6) // => [1, 2]
-  store.get() // => [0, 9, 6, 3]
+  const store = Store.init(['a', 'b', 'c', 'd'])
+  Store.arr(store, 'splice')(1, 2, 'x', 'y', 'z') // => ['b', 'c']
+  store.get() // => ['a', 'x', 'y', 'z', 'd']
   ```
 
   (static method) 
@@ -312,9 +312,9 @@ A store is a partially applied, existentially quantified lens with a change list
   Get partial stores for each position currently in the array
 
   ```typescript
-  const store = Store.init([0, 1, 2, 3])
-  Store.each(store).map((substore, i) => substore.modify(x => x + i))
-  store.get() // => [0, 2, 4, 6]
+  const store = Store.init(['a', 'b', 'c'])
+  Store.each(store).map((substore, i) => substore.modify(s => s + i.toString()))
+  store.get() // => ['a0', 'b1', 'c2']
   ```
 
   (static method)
@@ -428,7 +428,7 @@ History zipper functions
 const {undo, redo, advance, advance_to} = Undo
 const store = Store.init(Undo.init({a: 1, b: 2}))
 const modify = op => store.modify(op)
-const now = store.via(Undo.now())
+const now = store.at('now')
 now.get() // => {a: 1, b: 2}
 modify(advance_to({a: 3, b: 4}))
 now.get() // => {a: 3, b: 4}
@@ -458,16 +458,16 @@ now.get() // => {a: 1, b: 2}
 * **init**: `<S>(now: S) => Undo<S>`
 
   Initialise the history 
-* **now**: `<S>() => Lens<Undo<S>, S>`
-
-  Lens to the present moment 
 * **advance_to**: `<S>(s: S) => (h: Undo<S>) => Undo<S>`
 
   Advances the history to some new state 
 ### interface Undo
 
 History zipper 
-* **tip**: `Stack<S>`
+* **now**: `S`
+
+  
+* **prev**: `Stack<S>`
 
   
 * **next**: `Stack<S>`
