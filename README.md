@@ -80,6 +80,8 @@ body.appendChild(Input(store.at('right')))
   * advance
   * init
   * advance_to
+  * can_undo
+  * can_redo
 * interface Undo
   * now
   * prev
@@ -87,8 +89,13 @@ body.appendChild(Input(store.at('right')))
 * interface Stack
   * top
   * pop
+* module Requests
+  * request_maker
+  * request
+  * process_requests
 * Diff
 * Omit
+
 ## Documentation
 ### class Store
 
@@ -178,28 +185,28 @@ A store is a partially applied, existentially quantified lens with a change list
   React on a difference in value. Returns the unsubscribe function.
 
   ```typescript
-  const store = Store.init({a: 0})
-  let diffs = 0
-  const off = store.ondiff((new_value, old) => {
-    assert.notEqual(new_value, old)
-    diffs++
-  })
-  diffs // => 0
-  const object = {a: 1}
-  store.set(object)            // diff: new object
-  diffs                        // => 1
-  store.set(object)            // no diff: same object
-  diffs                        // => 1
-  store.set({a: 2})            // diff: new object
-  diffs                        // => 2
-  store.set({a: 2})            // diff: this is yet another new literal object
-  diffs                        // => 3
-  store.set(store.get())       // no diff: same object
-  diffs                        // => 3
-  store.modify(x => x)         // no diff: same object
-  diffs                        // => 3
-  store.at('a').modify(x => x) // diff: at does not see if the value actually changed
-  diffs                        // => 4
+    const store = Store.init({a: 0})
+    let diffs = 0
+    const off = store.ondiff((new_value, old) => {
+      assert.notEqual(new_value, old)
+      diffs++
+    })
+    diffs // => 0
+    const object = {a: 1}
+    store.set(object)            // diff: new object
+    diffs                        // => 1
+    store.set(object)            // no diff: same object
+    diffs                        // => 1
+    store.set({a: 2})            // diff: new object
+    diffs                        // => 2
+    store.set({a: 2})            // diff: this is yet another new literal object
+    diffs                        // => 3
+    store.set(store.get())       // no diff: same object
+    diffs                        // => 3
+    store.modify(x => x)         // no diff: same object
+    diffs                        // => 3
+    store.at('a').modify(x => x) // diff: at does not see if the value actually changed
+    diffs                        // => 4
   ```
 
   Note: keeps a reference to the last value in memory. 
@@ -213,9 +220,9 @@ A store is a partially applied, existentially quantified lens with a change list
   let last
   store.on(x => last = x)
   store.transaction(() => {
-  store.set(2)
-  assert.equal(last, undefined)
-  return 3
+    store.set(2)
+    assert.equal(last, undefined)
+    return 3
   })   // => 3
   last // => 2
   ```
@@ -461,6 +468,12 @@ now.get() // => {a: 1, b: 2}
 * **advance_to**: `<S>(s: S) => (h: Undo<S>) => Undo<S>`
 
   Advances the history to some new state 
+* **can_undo**: `<S>(h: Undo<S>) => boolean`
+
+  Is there a state to undo to? 
+* **can_redo**: `<S>(h: Undo<S>) => boolean`
+
+  Is there a state to redo to? 
 ### interface Undo
 
 History zipper 
@@ -482,6 +495,24 @@ A non-empty stack
 * **pop**: `Stack<S>`
 
   
+### module Requests
+
+Utility functions to make Elm/Redux-style requests
+
+A queue of requests are maintained in an array.
+
+TODO: Document and test. 
+* **request_maker**: `<R>(store: Store<Array<R>>) => (request: R) => void`
+
+  Make a function for making requests 
+* **request**: `<R>(store: Store<Array<R>>, request: R) => void`
+
+  Make a request 
+* **process_requests**: `<R>(store: Store<Array<R>>, process: (request: R) => void) => () => void`
+
+  Process requests, one at a time
+
+  Retuns the off function. 
 * **Diff**: `undefined`
 
   

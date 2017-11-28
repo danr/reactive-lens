@@ -654,6 +654,15 @@ export module Undo {
     return h => Lens.at<typeof h, 'now'>('now').set(advance(h), s)
   }
 
+  /** Is there a state to undo to? */
+  export function can_undo<S>(h: Undo<S>): boolean {
+    return h.prev != null
+  }
+
+  /** Is there a state to redo to? */
+  export function can_redo<S>(h: Undo<S>): boolean {
+    return h.next != null
+  }
 }
 
 /** History zipper */
@@ -699,6 +708,37 @@ function ListWithRemove<A>() {
         }
       })
     }
+  }
+}
+
+/** Utility functions to make Elm/Redux-style requests
+
+A queue of requests are maintained in an array.
+
+TODO: Document and test. */
+export module Requests {
+  /** Make a function for making requests */
+  export function request_maker<R>(store: Store<R[]>): (request: R) => void {
+    return Store.arr(store, 'push')
+  }
+
+  /** Make a request */
+  export function request<R>(store: Store<R[]>, request: R): void {
+    request_maker(store)(request)
+  }
+
+  /** Process requests, one at a time
+
+  Retuns the off function. */
+  export function process_requests<R>(store: Store<R[]>, process: (request: R) => void): () => void {
+    return store.ondiff(requests => {
+      if (requests.length > 0) {
+        store.transaction(() => {
+          store.set([])
+          requests.forEach(process)
+        })
+      }
+    })
   }
 }
 
