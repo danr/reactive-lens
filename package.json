@@ -24,7 +24,7 @@
     "compile": "tsc",
     "prebuild": "tsc",
     "build": "uglifyjs reactive-lens.js --mangle --toplevel --compress > reactive-lens.min.js",
-    "prepublish": "npm run build && npm run readme",
+    "prepublishOnly": "npm run build && npm run readme",
     "readme": "> README.md typescript-doctest src/*.ts -i header.md -s '## API overview' --toc -s '' -s '## Documentation' --doc"
   },
   "keywords": [
