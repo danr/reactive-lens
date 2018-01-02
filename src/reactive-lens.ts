@@ -379,27 +379,23 @@ export class Store<S> {
       }
     ): () => void
   {
-    let self = false
-    function update() {
-      if (!self) {
+    const update = () => {
+      const now = to_hash(this.get())
+      if (now != api.get()) {
         const updated = from_hash(api.get())
-        if (updated !== undefined) {
-          this.set(updated)
-        } else {
+        if (updated === undefined) {
           // gibberish, just revert it to what is now
-          self = true
           api.set(to_hash(this.get()))
+        } else {
+          this.set(updated)
         }
-      } else {
-        self = false
       }
     }
-    api.on(update.bind(this))
-    update.apply(this)
+    api.on(update)
+    update()
     return this.on(x => {
       const hash = to_hash(x)
       if (hash != api.get()) {
-        self = true // we don't need to react on this
         api.set(hash)
       }
     })
