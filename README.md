@@ -60,6 +60,7 @@ body.appendChild(Input(store.at('right')))
   * each
   * storage_connect
   * location_connect
+* attach
 * interface Lens
   * get
   * set
@@ -333,6 +334,9 @@ A store is a partially applied, existentially quantified lens with a change list
 * **location_connect**: `(to_hash: (state: S) => string, from_hash: (hash: string) => S, api?: { get(): string; set(hash: string): void; on(cb: () => void): void; }) => () => void`
 
   Connect with window.location.hash 
+* **attach**: `<S, VDOM>(render: (vdom: VDOM) => void, init_state: S, setup_view: (store: Store<S>) => () => VDOM) => (setup_next_view: (store: Store<S>) => () => VDOM) => void`
+
+  Attach a store with a virtual DOM, returning the reattach function for hot module reloading. 
 ### interface Lens
 
 A lens: allows you to operate on a subpart `T` of some data `S`

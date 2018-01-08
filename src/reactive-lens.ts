@@ -402,6 +402,34 @@ export class Store<S> {
   }
 }
 
+/** Attach a store with a virtual DOM, returning the reattach function for hot module reloading. */
+export function attach<S, VDOM>(
+    render: (vdom: VDOM) => void,
+    init_state: S,
+    setup_view: (store: Store<S>) => () => VDOM,
+  ): (setup_next_view: (store: Store<S>) => () => VDOM) => void {
+  function connect(store: Store<S>, setup_view: (store: Store<S>) => () => VDOM): () => void {
+    const view = setup_view(store)
+    function redraw() {
+      store.transaction(() => {
+        render(view())
+      })
+    }
+    const off = store.on(redraw)
+    redraw()
+    return off
+  }
+
+  let store = Store.init(init_state)
+  let off = connect(store, setup_view)
+
+  return setup_next_view => {
+    off()
+    store = Store.init(store.get())
+    off = connect(store, setup_next_view)
+  }
+}
+
 /** A lens: allows you to operate on a subpart `T` of some data `S`
 
 Lenses must conform to these three lens laws:
