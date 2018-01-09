@@ -49,14 +49,14 @@ export const View = (store: Store<State>): VNode => {
         {editing ? (
           <Input
             store={todo_store.at('text')}
-            onKeyDown={e => e.key == 'Enter' && todo_store.at('editing').set(false)}
-            onBlur={() => todo_store.at('editing').set(false)}
+            onKeyDown={e => e.key == 'Enter' && todo_store.update({editing: false})}
+            onBlur={() => todo_store.update({editing: false})}
             className="edit"
           />
         ) : (
           <label
             style={{cursor: 'pointer'}}
-            onDoubleClick={() => todo_store.at('editing').set(true)}>
+            onDoubleClick={() => todo_store.update({editing: true})}>
             {text}
           </label>
         )}
