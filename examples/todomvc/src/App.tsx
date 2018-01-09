@@ -21,6 +21,7 @@ export const App = (store: Store<State>) => {
   store.on(x => console.log(JSON.stringify(x, undefined, 2)))
   return () => View(store)
 }
+
 export const View = (store: Store<State>): VNode => {
   const {todos, visibility} = store.get()
   const todos_store = store.at('todos')
@@ -114,15 +115,16 @@ export const View = (store: Store<State>): VNode => {
 
 export type InputAttrs = React.InputHTMLAttributes<HTMLInputElement>
 
-export const Input = ({store, ...props}: {store: Store<string>} & InputAttrs) => (
-  <input {...props} value={store.get()} onChange={e => store.set(e.target.value)} />
-)
+export function Input({store, ...props}: {store: Store<string>} & InputAttrs) {
+  return <input {...props} value={store.get()} onChange={e => store.set(e.target.value)} />
+}
 
-export const Checkbox = ({store, ...props}: {store: Store<boolean>} & InputAttrs) => (
-  <input
+export function Checkbox({store, ...props}: {store: Store<boolean>} & InputAttrs) {
+  return <input
     {...props}
     type="checkbox"
     checked={store.get()}
     onChange={e => store.set(e.target.checked)}
   />
-)
+}
+
