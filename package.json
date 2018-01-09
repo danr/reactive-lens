@@ -12,9 +12,8 @@
     "covert": "^1.1.0",
     "tap-diff": "^0.1.1",
     "tape": "^4.8.0",
-    "ts-node": "^3.3.0",
     "typescript": "^2.4.2",
-    "uglify-js": "^3.1.7"
+    "uglify-js": "3.3.5"
   },
   "scripts": {
     "pretest": "> test/reactive-lens.doctest.ts typescript-doctest src/*.ts -s 'import { Store, Lens, Undo } from \"../src/reactive-lens\"' -t && tsc test/*.ts",
