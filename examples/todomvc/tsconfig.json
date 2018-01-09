@@ -1,0 +1,13 @@
+{
+    "compilerOptions": {
+        "sourceMap": true,
+        "noImplicitAny": true,
+        "strict": true,
+        "target": "es5",
+        "jsx": "react",
+        "noEmitOnError": true
+    },
+    "parcelTsPluginOptions": {
+        "transpileOnly": false
+    }
+}
