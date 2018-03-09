@@ -340,7 +340,7 @@ export class Store<S> {
   /** Connect with local storage */
   storage_connect(
       key: string = 'state',
-      audit: (s: S) => boolean = () => true,
+      audit: (s: S, str: string) => boolean = (_, str) => str.length < 1000000,
       api: {
         get: (key: string) => string | null,
         set: (key: string, data: string) => void
@@ -354,47 +354,49 @@ export class Store<S> {
     if (stored) {
       try {
         const parsed = JSON.parse(stored)
-        if (audit(parsed)) {
+        if (audit(parsed, stored)) {
           this.set(parsed)
         }
       } catch (_) {
         // pass
       }
     }
-    return this.on(s => api.set(key, JSON.stringify(s)))
+    return this.on(s => {
+      const str = JSON.stringify(s)
+      audit(s, str) && api.set(key, str)
+    })
   }
 
   /** Connect with window.location.hash */
-  location_connect(
-      to_hash: (state: S) => string,
-      from_hash: (hash: string) => S | undefined,
+  static location_connect(
+      store: Store<string>,
+      audit: (s: string) => boolean = () => true,
       api: {
         get(): string,
         set(hash: string): void,
         on(cb: () => void): void
       } = {
-        get() { return window.location.hash },
+        get() { return window.location.hash.slice(1) },
         set(s) { window.location.hash = s },
         on(cb) { window.onhashchange = cb }
       }
     ): () => void
   {
     const update = () => {
-      const now = to_hash(this.get())
+      const now = store.get()
       if (now != api.get()) {
-        const updated = from_hash(api.get())
-        if (updated === undefined) {
+        const updated = api.get()
+        if (!audit(updated)) {
           // gibberish, just revert it to what is now
-          api.set(to_hash(this.get()))
+          api.set(store.get())
         } else {
-          this.set(updated)
+          store.set(updated)
         }
       }
     }
     api.on(update)
     update()
-    return this.on(x => {
-      const hash = to_hash(x)
+    return store.on(hash => {
       if (hash != api.get()) {
         api.set(hash)
       }
