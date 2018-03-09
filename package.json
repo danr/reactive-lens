@@ -1,6 +1,6 @@
 {
   "name": "reactive-lens",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "A lightweight library for pure, reactive and composable state.",
   "author": "Dan Rosén",
   "license": "MIT",
@@ -23,7 +23,7 @@
     "compile": "tsc",
     "prebuild": "tsc",
     "build": "uglifyjs reactive-lens.js --mangle --toplevel --compress > reactive-lens.min.js",
-    "prepublishOnly": "npm run build && npm run readme",
+    "prepublishOnly": "npm run build",
     "readme": "> README.md typescript-doctest src/*.ts -i header.md -s '## API overview' --toc -s '' -s '## Documentation' --doc"
   },
   "keywords": [
